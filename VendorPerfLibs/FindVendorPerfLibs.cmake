@@ -40,6 +40,20 @@ function(find_VPL_MKL)
       /usr/include
   )
 
+  # Try to find FFTW3 include directory
+  find_path(VendorPerfLibs_FFTW3_INCLUDE_DIR NAMES fftw3.f03
+    HINTS
+      "${MKL_ROOT}/include"
+      "$ENV{MKLROOT}/include"
+      "$ENV{MKL_ROOT}/include"
+    PATHS
+      /opt/intel/oneapi/mkl/latest/include
+      /opt/intel/mkl/include
+      /usr/include/mkl
+      /usr/include
+    PATH_SUFFIXES fftw
+  )
+
   if(MKL_CORE_LIB)
     get_filename_component(VendorPerfLibs_LIB_DIR "${MKL_CORE_LIB}" DIRECTORY)
 
@@ -80,7 +94,7 @@ endfunction()
 find_VPL_MKL()
 
 find_package_handle_standard_args(VendorPerfLibs
-  REQUIRED_VARS VendorPerfLibs_INCLUDE_DIR VendorPerfLibs_FOUND_LIBRARIES
+  REQUIRED_VARS VendorPerfLibs_INCLUDE_DIR VendorPerfLibs_FFTW3_INCLUDE_DIR VendorPerfLibs_FOUND_LIBRARIES
 )
 
 if(VendorPerfLibs_FOUND)
@@ -106,7 +120,7 @@ if(VendorPerfLibs_FOUND)
   if(NOT TARGET VPL::fft)
     add_library(VPL::fft INTERFACE IMPORTED)
     set_target_properties(VPL::fft PROPERTIES
-      INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR}"
+      INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR};${VendorPerfLibs_FFTW3_INCLUDE_DIR}"
       INTERFACE_LINK_LIBRARIES "${VendorPerfLibs_LIBRARIES}"
     )
   endif()
