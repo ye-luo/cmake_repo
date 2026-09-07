@@ -19,6 +19,23 @@
 include(FindPackageHandleStandardArgs)
 
 function(find_VPL_MKL)
+  # Try to find the constituent libraries
+  find_library(MKL_CORE_LIB NAMES mkl_core
+    HINTS
+      "${MKL_ROOT}/lib/intel64"
+      "$ENV{MKLROOT}/lib/intel64"
+      "$ENV{MKL_ROOT}/lib/intel64"
+    PATHS
+      /opt/intel/oneapi/mkl/latest/lib/intel64
+      /opt/intel/mkl/lib/intel64
+      /usr/lib/x86_64-linux-gnu
+  )
+
+  if(NOT MKL_CORE_LIB)
+    set(VendorPerfLibs_FOUND_LIBRARIES FALSE PARENT_SCOPE)
+    return()
+  endif()
+
   # Try to find MKL include directory
   find_path(VendorPerfLibs_INCLUDE_DIR NAMES mkl.h
     HINTS
@@ -46,46 +63,32 @@ function(find_VPL_MKL)
     PATH_SUFFIXES fftw
   )
 
-  # Try to find the constituent libraries
-  find_library(MKL_CORE_LIB NAMES mkl_core
-    HINTS
-      "${MKL_ROOT}/lib/intel64"
-      "$ENV{MKLROOT}/lib/intel64"
-      "$ENV{MKL_ROOT}/lib/intel64"
-    PATHS
-      /opt/intel/oneapi/mkl/latest/lib/intel64
-      /opt/intel/mkl/lib/intel64
-      /usr/lib/x86_64-linux-gnu
+  get_filename_component(VendorPerfLibs_LIB_DIR "${MKL_CORE_LIB}" DIRECTORY)
+
+  set(VendorPerfLibs_INTERFACE_NAME mkl_gf_lp64)
+  if(CMAKE_Fortran_COMPILER_LOADED)
+    if(CMAKE_Fortran_COMPILER_ID MATCHES "^(Intel|IntelLLVM)$" OR CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+      set(VendorPerfLibs_INTERFACE_NAME mkl_intel_lp64)
+    endif()
+  endif()
+
+  find_library(MKL_INTERFACE_LIB NAMES ${VendorPerfLibs_INTERFACE_NAME}
+    PATHS "${VendorPerfLibs_LIB_DIR}"
+    NO_DEFAULT_PATH
   )
 
-  if(MKL_CORE_LIB)
-    get_filename_component(VendorPerfLibs_LIB_DIR "${MKL_CORE_LIB}" DIRECTORY)
-
-    set(VendorPerfLibs_INTERFACE_NAME mkl_gf_lp64)
-    if(CMAKE_Fortran_COMPILER_LOADED)
-      if(CMAKE_Fortran_COMPILER_ID MATCHES "^(Intel|IntelLLVM)$" OR CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
-        set(VendorPerfLibs_INTERFACE_NAME mkl_intel_lp64)
-      endif()
-    endif()
-
-    find_library(MKL_INTERFACE_LIB NAMES ${VendorPerfLibs_INTERFACE_NAME}
-      PATHS "${VendorPerfLibs_LIB_DIR}"
-      NO_DEFAULT_PATH
-    )
-
-    if(NOT VPL_THREADING)
-      set(VendorPerfLibs_THREAD_NAMES mkl_sequential)
-    elseif(VPL_THREADING STREQUAL "iomp5")
-      set(VendorPerfLibs_THREAD_NAMES mkl_intel_thread)
-    else()
-      set(VendorPerfLibs_THREAD_NAMES mkl_gnu_thread)
-    endif()
-
-    find_library(MKL_THREAD_LIB NAMES ${VendorPerfLibs_THREAD_NAMES}
-      PATHS "${VendorPerfLibs_LIB_DIR}"
-      NO_DEFAULT_PATH
-    )
+  if(NOT VPL_THREADING)
+    set(VendorPerfLibs_THREAD_NAMES mkl_sequential)
+  elseif(VPL_THREADING STREQUAL "iomp5")
+    set(VendorPerfLibs_THREAD_NAMES mkl_intel_thread)
+  else()
+    set(VendorPerfLibs_THREAD_NAMES mkl_gnu_thread)
   endif()
+
+  find_library(MKL_THREAD_LIB NAMES ${VendorPerfLibs_THREAD_NAMES}
+    PATHS "${VendorPerfLibs_LIB_DIR}"
+    NO_DEFAULT_PATH
+  )
 
   if(MKL_CORE_LIB AND MKL_INTERFACE_LIB AND MKL_THREAD_LIB)
     set(VendorPerfLibs_LIBRARIES ${MKL_INTERFACE_LIB} ${MKL_THREAD_LIB} ${MKL_CORE_LIB} pthread m dl PARENT_SCOPE)
@@ -96,6 +99,32 @@ function(find_VPL_MKL)
 endfunction()
 
 function(find_VPL_NVPL)
+  # Determine thread suffix
+  if(NOT VPL_THREADING)
+    set(NVPL_THREAD_SUFFIX "seq")
+  else()
+    set(NVPL_THREAD_SUFFIX "gomp")
+  endif()
+
+  set(NVPL_INTERFACE_SUFFIX "lp64")
+
+  # Try to find the constituent libraries
+  find_library(NVPL_BLAS_LIB NAMES nvpl_blas_${NVPL_INTERFACE_SUFFIX}_${NVPL_THREAD_SUFFIX}
+    HINTS
+      "${NVPL_ROOT}/lib"
+      "$ENV{NVPLROOT}/lib"
+      "$ENV{NVPL_ROOT}/lib"
+    PATHS
+      /opt/nvidia/nvpl/lib
+      /usr/lib/aarch64-linux-gnu
+      /usr/lib
+  )
+
+  if(NOT NVPL_BLAS_LIB)
+    set(VendorPerfLibs_FOUND_LIBRARIES FALSE PARENT_SCOPE)
+    return()
+  endif()
+
   # Try to find NVPL include directory
   find_path(VendorPerfLibs_INCLUDE_DIR NAMES nvpl_blas.h
     HINTS
@@ -119,40 +148,17 @@ function(find_VPL_NVPL)
     PATH_SUFFIXES fftw
   )
 
-  # Determine thread suffix
-  if(NOT VPL_THREADING)
-    set(NVPL_THREAD_SUFFIX "seq")
-  else()
-    set(NVPL_THREAD_SUFFIX "gomp")
-  endif()
+  get_filename_component(VendorPerfLibs_LIB_DIR "${NVPL_BLAS_LIB}" DIRECTORY)
 
-  set(NVPL_INTERFACE_SUFFIX "lp64")
-
-  # Try to find the constituent libraries
-  find_library(NVPL_BLAS_LIB NAMES nvpl_blas_${NVPL_INTERFACE_SUFFIX}_${NVPL_THREAD_SUFFIX}
-    HINTS
-      "${NVPL_ROOT}/lib"
-      "$ENV{NVPLROOT}/lib"
-      "$ENV{NVPL_ROOT}/lib"
-    PATHS
-      /opt/nvidia/nvpl/lib
-      /usr/lib/aarch64-linux-gnu
-      /usr/lib
+  find_library(NVPL_LAPACK_LIB NAMES nvpl_lapack_${NVPL_INTERFACE_SUFFIX}_${NVPL_THREAD_SUFFIX}
+    PATHS "${VendorPerfLibs_LIB_DIR}"
+    NO_DEFAULT_PATH
   )
 
-  if(NVPL_BLAS_LIB)
-    get_filename_component(VendorPerfLibs_LIB_DIR "${NVPL_BLAS_LIB}" DIRECTORY)
-
-    find_library(NVPL_LAPACK_LIB NAMES nvpl_lapack_${NVPL_INTERFACE_SUFFIX}_${NVPL_THREAD_SUFFIX}
-      PATHS "${VendorPerfLibs_LIB_DIR}"
-      NO_DEFAULT_PATH
-    )
-
-    find_library(NVPL_FFTW_LIB NAMES nvpl_fftw
-      PATHS "${VendorPerfLibs_LIB_DIR}"
-      NO_DEFAULT_PATH
-    )
-  endif()
+  find_library(NVPL_FFTW_LIB NAMES nvpl_fftw
+    PATHS "${VendorPerfLibs_LIB_DIR}"
+    NO_DEFAULT_PATH
+  )
 
   if(NVPL_BLAS_LIB AND NVPL_LAPACK_LIB AND NVPL_FFTW_LIB)
     set(VendorPerfLibs_LIBRARIES ${NVPL_LAPACK_LIB} ${NVPL_BLAS_LIB} ${NVPL_FFTW_LIB} pthread m dl PARENT_SCOPE)
