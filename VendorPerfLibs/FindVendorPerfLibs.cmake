@@ -283,6 +283,7 @@ function(find_VPL_ARMPL)
       "${ARMPL_ROOT}/include"
       "$ENV{armpl_ROOT}/include"
       "$ENV{ARMPL_ROOT}/include"
+      "$ENV{ARMPL_DIR}/include"
     PATHS
       /opt/arm/armpl/include
   )
@@ -294,6 +295,7 @@ function(find_VPL_ARMPL)
         "${ARMPL_ROOT}/include"
         "$ENV{armpl_ROOT}/include"
         "$ENV{ARMPL_ROOT}/include"
+        "$ENV{ARMPL_DIR}/include"
       PATHS
         /opt/arm/armpl/include
       PATH_SUFFIXES fftw
@@ -305,6 +307,7 @@ function(find_VPL_ARMPL)
       "${ARMPL_ROOT}/lib"
       "$ENV{armpl_ROOT}/lib"
       "$ENV{ARMPL_ROOT}/lib"
+      "$ENV{ARMPL_DIR}/lib"
     PATHS
       /opt/arm/armpl/lib
   )
