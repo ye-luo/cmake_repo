@@ -6,6 +6,10 @@
 # - VPL::fft
 #
 # Input variables:
+# - VPL_Name: Specifies the vendor performance library to search for. Acceptable values are:
+#     - unset      : Search any vendor libraries
+#     - "IntelMKL" : Intel Math Kernel Library
+#     - "NVPL"     : NVIDIA Performance Libraries
 # - VPL_THREADING: Specifies the threading layer to use. Acceptable values are:
 #     - unset    : Sequential (mkl_sequential) - default
 #     - "gomp"   : GNU OpenMP runtime (mkl_gnu_thread)
@@ -91,7 +95,9 @@ function(find_VPL_MKL)
   endif()
 endfunction()
 
-find_VPL_MKL()
+if(NOT VPL_Name OR VPL_Name STREQUAL "IntelMKL")
+  find_VPL_MKL()
+endif()
 
 find_package_handle_standard_args(VendorPerfLibs
   REQUIRED_VARS VendorPerfLibs_INCLUDE_DIR VendorPerfLibs_FFTW3_INCLUDE_DIR VendorPerfLibs_FOUND_LIBRARIES
