@@ -10,6 +10,7 @@
 #     - unset      : Search any vendor libraries
 #     - "IntelMKL" : Intel Math Kernel Library
 #     - "NVPL"     : NVIDIA Performance Libraries
+#     - "ARMPL"    : ARM Performance Libraries
 # - VPL_THREADING: Specifies the threading layer to use. Acceptable values are:
 #     - unset    : Sequential (mkl_sequential) - default
 #     - "gomp"   : GNU OpenMP runtime (mkl_gnu_thread)
@@ -212,11 +213,72 @@ function(find_VPL_NVPL)
   endif()
 endfunction()
 
+function(find_VPL_ARMPL)
+  # Determine thread suffix
+  if(NOT VPL_THREADING)
+    set(ARMPL_THREAD_SUFFIX "")
+  else()
+    set(ARMPL_THREAD_SUFFIX "_mp")
+  endif()
+
+  set(ARMPL_INTERFACE_SUFFIX "lp64")
+  set(ARMPL_LIB_NAME armpl_${ARMPL_INTERFACE_SUFFIX}${ARMPL_THREAD_SUFFIX})
+
+  # Try to find ARMPL include directory
+  find_path(VendorPerfLibs_INCLUDE_DIR NAMES armpl.h
+    HINTS
+      "${ARMPL_ROOT}/include"
+      "$ENV{armpl_ROOT}/include"
+      "$ENV{ARMPL_ROOT}/include"
+    PATHS
+      /opt/arm/armpl/include
+      /usr/include
+  )
+
+  # Try to find FFTW3 include directory
+  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+    find_path(VendorPerfLibs_FFTW3_INCLUDE_DIR NAMES fftw3.f03
+      HINTS
+        "${ARMPL_ROOT}/include"
+        "$ENV{armpl_ROOT}/include"
+        "$ENV{ARMPL_ROOT}/include"
+      PATHS
+        /opt/arm/armpl/include
+        /usr/include
+      PATH_SUFFIXES fftw
+    )
+  endif()
+
+  find_library(ARMPL_LIB NAMES ${ARMPL_LIB_NAME}
+    HINTS
+      "${ARMPL_ROOT}/lib"
+      "$ENV{armpl_ROOT}/lib"
+      "$ENV{ARMPL_ROOT}/lib"
+    PATHS
+      /opt/arm/armpl/lib
+      /usr/lib/aarch64-linux-gnu
+      /usr/lib
+  )
+
+  if(ARMPL_LIB)
+    set(_vpl_libs ${ARMPL_LIB})
+    list(APPEND _vpl_libs pthread m dl)
+    set(VendorPerfLibs_LIBRARIES ${_vpl_libs} PARENT_SCOPE)
+    set(VendorPerfLibs_FOUND_LIBRARIES TRUE PARENT_SCOPE)
+  else()
+    set(VendorPerfLibs_FOUND_LIBRARIES FALSE PARENT_SCOPE)
+  endif()
+endfunction()
+
+
 if(NOT VendorPerfLibs_FOUND_LIBRARIES AND NOT VPL_Name OR VPL_Name STREQUAL "IntelMKL")
   find_VPL_MKL()
 endif()
 if(NOT VendorPerfLibs_FOUND_LIBRARIES AND NOT VPL_Name OR VPL_Name STREQUAL "NVPL")
   find_VPL_NVPL()
+endif()
+if(NOT VendorPerfLibs_FOUND_LIBRARIES AND NOT VPL_Name OR VPL_Name STREQUAL "ARMPL")
+  find_VPL_ARMPL()
 endif()
 
 set(_vpl_required_vars VendorPerfLibs_INCLUDE_DIR VendorPerfLibs_FOUND_LIBRARIES)
