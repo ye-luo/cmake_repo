@@ -148,14 +148,14 @@ function(find_VPL_NVPL)
 
   # Try to find FFTW3 include directory
   if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-    find_path(VendorPerfLibs_FFTW3_INCLUDE_DIR NAMES nvpl_fftw.h fftw3.f03
+    find_path(VendorPerfLibs_FFTW3_INCLUDE_DIR NAMES fftw3.f03
       HINTS
         "${NVPL_ROOT}/include"
         "$ENV{nvpl_ROOT}/include"
         "$ENV{NVPL_ROOT}/include"
       PATHS
         /opt/nvidia/nvpl/include
-      PATH_SUFFIXES fftw
+      PATH_SUFFIXES nvpl_fftw
     )
   endif()
 
