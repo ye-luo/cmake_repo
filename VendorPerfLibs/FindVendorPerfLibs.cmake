@@ -428,6 +428,9 @@ function(find_VPL_AOCL)
   endif()
 endfunction()
 
+if(VendorPerfLibs_FIND_COMPONENTS AND "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS AND NOT "blas" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+  list(APPEND VendorPerfLibs_FIND_COMPONENTS "blas")
+endif()
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
   if(NOT VPL_ID OR VPL_ID STREQUAL "IntelMKL")
