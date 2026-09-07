@@ -14,8 +14,8 @@
 #     - "AOCL"     : AMD Optimizing CPU Libraries
 # - VPL_THREADING: Specifies the threading layer to use. Acceptable values are:
 #     - unset    : Sequential (mkl_sequential) - default
-#     - "gomp"   : GNU OpenMP runtime (mkl_gnu_thread)
-#     - "iomp5"  : Intel OpenMP runtime (mkl_intel_thread)
+#     - "gomp"   : GCC's libgomp, or any OpenMP runtime providing a compatibility layer for it
+#     - "iomp5"  : Intel's libiomp5, or any OpenMP runtime providing a compatibility layer for it
 #
 
 include(FindPackageHandleStandardArgs)
@@ -95,7 +95,12 @@ function(find_VPL_MKL)
   )
 
   if(MKL_CORE_LIB AND MKL_INTERFACE_LIB AND MKL_THREAD_LIB)
-    set(VendorPerfLibs_LIBRARIES ${MKL_INTERFACE_LIB} ${MKL_THREAD_LIB} ${MKL_CORE_LIB} pthread m dl PARENT_SCOPE)
+    set(_vpl_libs ${MKL_INTERFACE_LIB} ${MKL_THREAD_LIB} ${MKL_CORE_LIB})
+    if(VPL_THREADING)
+      list(APPEND _vpl_libs ${VPL_THREADING})
+    endif()
+    list(APPEND _vpl_libs pthread m dl)
+    set(VendorPerfLibs_LIBRARIES ${_vpl_libs} PARENT_SCOPE)
     set(VendorPerfLibs_FOUND_LIBRARIES TRUE PARENT_SCOPE)
   else()
     set(VendorPerfLibs_FOUND_LIBRARIES FALSE PARENT_SCOPE)
@@ -206,6 +211,9 @@ function(find_VPL_NVPL)
     if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
       list(APPEND _vpl_libs ${NVPL_FFTW_LIB})
     endif()
+    if(VPL_THREADING)
+      list(APPEND _vpl_libs ${VPL_THREADING})
+    endif()
     list(APPEND _vpl_libs pthread m dl)
     set(VendorPerfLibs_LIBRARIES ${_vpl_libs} PARENT_SCOPE)
     set(VendorPerfLibs_FOUND_LIBRARIES TRUE PARENT_SCOPE)
@@ -263,6 +271,9 @@ function(find_VPL_ARMPL)
 
   if(ARMPL_LIB)
     set(_vpl_libs ${ARMPL_LIB})
+    if(VPL_THREADING)
+      list(APPEND _vpl_libs ${VPL_THREADING})
+    endif()
     list(APPEND _vpl_libs pthread m dl)
     set(VendorPerfLibs_LIBRARIES ${_vpl_libs} PARENT_SCOPE)
     set(VendorPerfLibs_FOUND_LIBRARIES TRUE PARENT_SCOPE)
@@ -368,7 +379,7 @@ function(find_VPL_AOCL)
     endif()
 
     if(VPL_THREADING)
-      list(APPEND _vpl_libs "gomp")
+      list(APPEND _vpl_libs ${VPL_THREADING})
     endif()
 
     list(APPEND _vpl_libs pthread m dl)
