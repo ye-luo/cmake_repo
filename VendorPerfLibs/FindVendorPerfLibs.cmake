@@ -112,7 +112,7 @@ function(find_VPL_NVPL)
   find_library(NVPL_BLAS_LIB NAMES nvpl_blas_${NVPL_INTERFACE_SUFFIX}_${NVPL_THREAD_SUFFIX}
     HINTS
       "${NVPL_ROOT}/lib"
-      "$ENV{NVPLROOT}/lib"
+      "$ENV{nvpl_ROOT}/lib"
       "$ENV{NVPL_ROOT}/lib"
     PATHS
       /opt/nvidia/nvpl/lib
@@ -129,7 +129,7 @@ function(find_VPL_NVPL)
   find_path(VendorPerfLibs_INCLUDE_DIR NAMES nvpl_blas.h
     HINTS
       "${NVPL_ROOT}/include"
-      "$ENV{NVPLROOT}/include"
+      "$ENV{nvpl_ROOT}/include"
       "$ENV{NVPL_ROOT}/include"
     PATHS
       /opt/nvidia/nvpl/include
@@ -140,7 +140,7 @@ function(find_VPL_NVPL)
   find_path(VendorPerfLibs_FFTW3_INCLUDE_DIR NAMES nvpl_fftw.h fftw3.f03
     HINTS
       "${NVPL_ROOT}/include"
-      "$ENV{NVPLROOT}/include"
+      "$ENV{nvpl_ROOT}/include"
       "$ENV{NVPL_ROOT}/include"
     PATHS
       /opt/nvidia/nvpl/include
