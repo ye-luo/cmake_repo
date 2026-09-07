@@ -40,7 +40,6 @@ function(find_VPL_MKL)
     PATHS
       /opt/intel/oneapi/mkl/latest/lib/intel64
       /opt/intel/mkl/lib/intel64
-      /usr/lib/x86_64-linux-gnu
   )
 
   if(NOT MKL_CORE_LIB)
@@ -57,8 +56,7 @@ function(find_VPL_MKL)
     PATHS
       /opt/intel/oneapi/mkl/latest/include
       /opt/intel/mkl/include
-      /usr/include/mkl
-      /usr/include
+    PATH_SUFFIXES mkl
   )
 
   # Try to find FFTW3 include directory
@@ -71,9 +69,7 @@ function(find_VPL_MKL)
       PATHS
         /opt/intel/oneapi/mkl/latest/include
         /opt/intel/mkl/include
-        /usr/include/mkl
-        /usr/include
-      PATH_SUFFIXES fftw
+      PATH_SUFFIXES fftw mkl/fftw
     )
   endif()
 
@@ -126,7 +122,6 @@ function(find_VPL_NVPL)
       "$ENV{NVPL_ROOT}/include"
     PATHS
       /opt/nvidia/nvpl/include
-      /usr/include
   )
 
   # Determine thread suffix
@@ -147,8 +142,6 @@ function(find_VPL_NVPL)
         "$ENV{NVPL_ROOT}/lib"
       PATHS
         /opt/nvidia/nvpl/lib
-        /usr/lib/aarch64-linux-gnu
-        /usr/lib
     )
   endif()
 
@@ -162,7 +155,6 @@ function(find_VPL_NVPL)
         "$ENV{NVPL_ROOT}/include"
       PATHS
         /opt/nvidia/nvpl/include
-        /usr/include
       PATH_SUFFIXES fftw
     )
   endif()
@@ -175,8 +167,6 @@ function(find_VPL_NVPL)
         "$ENV{NVPL_ROOT}/lib"
       PATHS
         /opt/nvidia/nvpl/lib
-        /usr/lib/aarch64-linux-gnu
-        /usr/lib
     )
   endif()
 
@@ -188,8 +178,6 @@ function(find_VPL_NVPL)
         "$ENV{NVPL_ROOT}/lib"
       PATHS
         /opt/nvidia/nvpl/lib
-        /usr/lib/aarch64-linux-gnu
-        /usr/lib
     )
   endif()
 
@@ -251,7 +239,6 @@ function(find_VPL_ARMPL)
       "$ENV{ARMPL_ROOT}/include"
     PATHS
       /opt/arm/armpl/include
-      /usr/include
   )
 
   # Try to find FFTW3 include directory
@@ -263,7 +250,6 @@ function(find_VPL_ARMPL)
         "$ENV{ARMPL_ROOT}/include"
       PATHS
         /opt/arm/armpl/include
-        /usr/include
       PATH_SUFFIXES fftw
     )
   endif()
@@ -275,8 +261,6 @@ function(find_VPL_ARMPL)
       "$ENV{ARMPL_ROOT}/lib"
     PATHS
       /opt/arm/armpl/lib
-      /usr/lib/aarch64-linux-gnu
-      /usr/lib
   )
 
   if(ARMPL_LIB)
@@ -308,7 +292,6 @@ function(find_VPL_AOCL)
       "$ENV{AOCL_ROOT}/include"
     PATHS
       /opt/AMD/aocl/aocl-linux-gcc/include
-      /usr/include
   )
 
   if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
@@ -318,7 +301,6 @@ function(find_VPL_AOCL)
         "$ENV{AOCL_ROOT}/include"
       PATHS
         /opt/AMD/aocl/aocl-linux-gcc/include
-        /usr/include
       PATH_SUFFIXES fftw fftw3
     )
   endif()
@@ -330,8 +312,6 @@ function(find_VPL_AOCL)
         "$ENV{AOCL_ROOT}/lib"
       PATHS
         /opt/AMD/aocl/aocl-linux-gcc/lib
-        /usr/lib/x86_64-linux-gnu
-        /usr/lib
     )
   endif()
 
@@ -342,8 +322,6 @@ function(find_VPL_AOCL)
         "$ENV{AOCL_ROOT}/lib"
       PATHS
         /opt/AMD/aocl/aocl-linux-gcc/lib
-        /usr/lib/x86_64-linux-gnu
-        /usr/lib
     )
   endif()
 
@@ -354,8 +332,6 @@ function(find_VPL_AOCL)
         "$ENV{AOCL_ROOT}/lib"
       PATHS
         /opt/AMD/aocl/aocl-linux-gcc/lib
-        /usr/lib/x86_64-linux-gnu
-        /usr/lib
     )
   endif()
 
