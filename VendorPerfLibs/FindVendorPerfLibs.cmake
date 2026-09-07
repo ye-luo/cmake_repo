@@ -16,7 +16,7 @@ include(FindPackageHandleStandardArgs)
 
 function(find_VPL_MKL)
   # Try to find the constituent libraries
-  find_library(VendorPerfLibs_CORE_LIB NAMES mkl_core
+  find_library(MKL_CORE_LIB NAMES mkl_core
     HINTS
       "${MKL_ROOT}/lib/intel64"
       "$ENV{MKLROOT}/lib/intel64"
@@ -40,8 +40,8 @@ function(find_VPL_MKL)
       /usr/include
   )
 
-  if(VendorPerfLibs_CORE_LIB)
-    get_filename_component(VendorPerfLibs_LIB_DIR "${VendorPerfLibs_CORE_LIB}" DIRECTORY)
+  if(MKL_CORE_LIB)
+    get_filename_component(VendorPerfLibs_LIB_DIR "${MKL_CORE_LIB}" DIRECTORY)
 
     set(VendorPerfLibs_INTERFACE_NAME mkl_gf_lp64)
     if(CMAKE_Fortran_COMPILER_LOADED)
@@ -50,7 +50,7 @@ function(find_VPL_MKL)
       endif()
     endif()
 
-    find_library(VendorPerfLibs_INTERFACE_LIB NAMES ${VendorPerfLibs_INTERFACE_NAME}
+    find_library(MKL_INTERFACE_LIB NAMES ${VendorPerfLibs_INTERFACE_NAME}
       PATHS "${VendorPerfLibs_LIB_DIR}"
       NO_DEFAULT_PATH
     )
@@ -63,14 +63,14 @@ function(find_VPL_MKL)
       set(VendorPerfLibs_THREAD_NAMES mkl_gnu_thread)
     endif()
 
-    find_library(VendorPerfLibs_THREAD_LIB NAMES ${VendorPerfLibs_THREAD_NAMES}
+    find_library(MKL_THREAD_LIB NAMES ${VendorPerfLibs_THREAD_NAMES}
       PATHS "${VendorPerfLibs_LIB_DIR}"
       NO_DEFAULT_PATH
     )
   endif()
 
-  if(VendorPerfLibs_CORE_LIB AND VendorPerfLibs_INTERFACE_LIB AND VendorPerfLibs_THREAD_LIB)
-    set(VendorPerfLibs_LIBRARIES ${VendorPerfLibs_INTERFACE_LIB} ${VendorPerfLibs_THREAD_LIB} ${VendorPerfLibs_CORE_LIB} pthread m dl PARENT_SCOPE)
+  if(MKL_CORE_LIB AND MKL_INTERFACE_LIB AND MKL_THREAD_LIB)
+    set(VendorPerfLibs_LIBRARIES ${MKL_INTERFACE_LIB} ${MKL_THREAD_LIB} ${MKL_CORE_LIB} pthread m dl PARENT_SCOPE)
     set(VendorPerfLibs_FOUND_LIBRARIES TRUE PARENT_SCOPE)
   else()
     set(VendorPerfLibs_FOUND_LIBRARIES FALSE PARENT_SCOPE)
