@@ -20,6 +20,16 @@
 
 include(FindPackageHandleStandardArgs)
 
+set(_VPL_VALID_NAMES "" "IntelMKL" "NVPL" "ARMPL" "AOCL")
+if(DEFINED VPL_Name AND NOT VPL_Name IN_LIST _VPL_VALID_NAMES)
+  message(FATAL_ERROR "VendorPerfLibs: Unknown VPL_Name '${VPL_Name}'. Acceptable values are: unset, 'IntelMKL', 'NVPL', 'ARMPL', 'AOCL'")
+endif()
+
+set(_VPL_VALID_THREADINGS "" "gomp" "iomp5")
+if(DEFINED VPL_THREADING AND NOT VPL_THREADING IN_LIST _VPL_VALID_THREADINGS)
+  message(FATAL_ERROR "VendorPerfLibs: Unknown VPL_THREADING '${VPL_THREADING}'. Acceptable values are: unset, 'gomp', 'iomp5'")
+endif()
+
 function(find_VPL_MKL)
   # Try to find the constituent libraries
   find_library(MKL_CORE_LIB NAMES mkl_core
