@@ -15,28 +15,29 @@
 include(FindPackageHandleStandardArgs)
 
 function(find_VPL_MKL)
+  # Try to find the constituent libraries
+  find_library(VendorPerfLibs_CORE_LIB NAMES mkl_core
+    HINTS
+      "${MKL_ROOT}/lib/intel64"
+      "$ENV{MKLROOT}/lib/intel64"
+      "$ENV{MKL_ROOT}/lib/intel64"
+    PATHS
+      /opt/intel/oneapi/mkl/latest/lib/intel64
+      /opt/intel/mkl/lib/intel64
+      /usr/lib/x86_64-linux-gnu
+  )
+
   # Try to find MKL include directory
   find_path(VendorPerfLibs_INCLUDE_DIR NAMES mkl.h
     HINTS
-      $ENV{MKLROOT}/include
-      $ENV{MKL_ROOT}/include
-      ${MKLROOT}/include
+      "${MKL_ROOT}/include"
+      "$ENV{MKLROOT}/include"
+      "$ENV{MKL_ROOT}/include"
     PATHS
       /opt/intel/oneapi/mkl/latest/include
       /opt/intel/mkl/include
       /usr/include/mkl
       /usr/include
-  )
-
-  # Try to find the constituent libraries
-  find_library(VendorPerfLibs_CORE_LIB NAMES mkl_core
-    HINTS
-      $ENV{MKLROOT}/lib/intel64
-      $ENV{MKL_ROOT}/lib/intel64
-    PATHS
-      /opt/intel/oneapi/mkl/latest/lib/intel64
-      /opt/intel/mkl/lib/intel64
-      /usr/lib/x86_64-linux-gnu
   )
 
   set(VendorPerfLibs_INTERFACE_NAME mkl_gf_lp64)
@@ -48,8 +49,9 @@ function(find_VPL_MKL)
 
   find_library(VendorPerfLibs_INTERFACE_LIB NAMES ${VendorPerfLibs_INTERFACE_NAME}
     HINTS
-      $ENV{MKLROOT}/lib/intel64
-      $ENV{MKL_ROOT}/lib/intel64
+      "${MKL_ROOT}/lib/intel64"
+      "$ENV{MKLROOT}/lib/intel64"
+      "$ENV{MKL_ROOT}/lib/intel64"
     PATHS
       /opt/intel/oneapi/mkl/latest/lib/intel64
       /opt/intel/mkl/lib/intel64
@@ -66,8 +68,9 @@ function(find_VPL_MKL)
 
   find_library(VendorPerfLibs_THREAD_LIB NAMES ${VendorPerfLibs_THREAD_NAMES}
     HINTS
-      $ENV{MKLROOT}/lib/intel64
-      $ENV{MKL_ROOT}/lib/intel64
+      "${MKL_ROOT}/lib/intel64"
+      "$ENV{MKLROOT}/lib/intel64"
+      "$ENV{MKL_ROOT}/lib/intel64"
     PATHS
       /opt/intel/oneapi/mkl/latest/lib/intel64
       /opt/intel/mkl/lib/intel64
