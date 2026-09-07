@@ -1,8 +1,8 @@
 # FindVendorPerfLibs.cmake
 #
 # Searches for Intel MKL and creates the following CMake interface targets:
-# - VPL::BLAS
-# - VPL::LAPACK
+# - VPL::blas
+# - VPL::lapack
 # - VPL::fft
 #
 # Input variables:
@@ -98,19 +98,19 @@ find_package_handle_standard_args(VendorPerfLibs
 )
 
 if(VendorPerfLibs_FOUND)
-  # Create VPL::BLAS
-  if(NOT TARGET VPL::BLAS)
-    add_library(VPL::BLAS INTERFACE IMPORTED)
-    set_target_properties(VPL::BLAS PROPERTIES
+  # Create VPL::blas
+  if(NOT TARGET VPL::blas)
+    add_library(VPL::blas INTERFACE IMPORTED)
+    set_target_properties(VPL::blas PROPERTIES
       INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR}"
       INTERFACE_LINK_LIBRARIES "${VendorPerfLibs_LIBRARIES}"
     )
   endif()
 
-  # Create VPL::LAPACK
-  if(NOT TARGET VPL::LAPACK)
-    add_library(VPL::LAPACK INTERFACE IMPORTED)
-    set_target_properties(VPL::LAPACK PROPERTIES
+  # Create VPL::lapack
+  if(NOT TARGET VPL::lapack)
+    add_library(VPL::lapack INTERFACE IMPORTED)
+    set_target_properties(VPL::lapack PROPERTIES
       INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR}"
       INTERFACE_LINK_LIBRARIES "${VendorPerfLibs_LIBRARIES}"
     )
