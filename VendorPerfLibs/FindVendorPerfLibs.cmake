@@ -11,6 +11,7 @@
 #     - "IntelMKL" : Intel Math Kernel Library
 #     - "NVPL"     : NVIDIA Performance Libraries
 #     - "ARMPL"    : ARM Performance Libraries
+#     - "AOCL"     : AMD Optimizing CPU Libraries
 # - VPL_THREADING: Specifies the threading layer to use. Acceptable values are:
 #     - unset    : Sequential (mkl_sequential) - default
 #     - "gomp"   : GNU OpenMP runtime (mkl_gnu_thread)
@@ -270,6 +271,115 @@ function(find_VPL_ARMPL)
   endif()
 endfunction()
 
+function(find_VPL_AOCL)
+  if(NOT VPL_THREADING)
+    set(AOCL_BLAS_LIB_NAME "blis")
+    set(AOCL_FFTW_LIB_NAME "fftw3")
+  else()
+    set(AOCL_BLAS_LIB_NAME "blis-mt")
+    set(AOCL_FFTW_LIB_NAME "fftw3_omp")
+  endif()
+  set(AOCL_LAPACK_LIB_NAME "flame")
+
+  find_path(VendorPerfLibs_INCLUDE_DIR NAMES aocl.h blis.h
+    HINTS
+      "${AOCL_ROOT}/include"
+      "$ENV{AOCL_ROOT}/include"
+    PATHS
+      /opt/AMD/aocl/aocl-linux-gcc/include
+      /usr/include
+  )
+
+  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+    find_path(VendorPerfLibs_FFTW3_INCLUDE_DIR NAMES fftw3.f03 fftw3.h
+      HINTS
+        "${AOCL_ROOT}/include"
+        "$ENV{AOCL_ROOT}/include"
+      PATHS
+        /opt/AMD/aocl/aocl-linux-gcc/include
+        /usr/include
+      PATH_SUFFIXES fftw fftw3
+    )
+  endif()
+
+  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "blas" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+    find_library(AOCL_BLAS_LIB NAMES ${AOCL_BLAS_LIB_NAME}
+      HINTS
+        "${AOCL_ROOT}/lib"
+        "$ENV{AOCL_ROOT}/lib"
+      PATHS
+        /opt/AMD/aocl/aocl-linux-gcc/lib
+        /usr/lib/x86_64-linux-gnu
+        /usr/lib
+    )
+  endif()
+
+  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+    find_library(AOCL_LAPACK_LIB NAMES ${AOCL_LAPACK_LIB_NAME}
+      HINTS
+        "${AOCL_ROOT}/lib"
+        "$ENV{AOCL_ROOT}/lib"
+      PATHS
+        /opt/AMD/aocl/aocl-linux-gcc/lib
+        /usr/lib/x86_64-linux-gnu
+        /usr/lib
+    )
+  endif()
+
+  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+    find_library(AOCL_FFTW_LIB NAMES ${AOCL_FFTW_LIB_NAME}
+      HINTS
+        "${AOCL_ROOT}/lib"
+        "$ENV{AOCL_ROOT}/lib"
+      PATHS
+        /opt/AMD/aocl/aocl-linux-gcc/lib
+        /usr/lib/x86_64-linux-gnu
+        /usr/lib
+    )
+  endif()
+
+  set(_aocl_found TRUE)
+  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "blas" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+    if(NOT AOCL_BLAS_LIB)
+      set(_aocl_found FALSE)
+    endif()
+  endif()
+  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+    if(NOT AOCL_LAPACK_LIB)
+      set(_aocl_found FALSE)
+    endif()
+  endif()
+  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+    if(NOT AOCL_FFTW_LIB)
+      set(_aocl_found FALSE)
+    endif()
+  endif()
+
+  if(_aocl_found)
+    set(_vpl_libs)
+    if(NOT VendorPerfLibs_FIND_COMPONENTS OR "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+      list(APPEND _vpl_libs ${AOCL_LAPACK_LIB})
+    endif()
+    if(NOT VendorPerfLibs_FIND_COMPONENTS OR "blas" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+      list(APPEND _vpl_libs ${AOCL_BLAS_LIB})
+    endif()
+    if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+      list(APPEND _vpl_libs ${AOCL_FFTW_LIB})
+    endif()
+
+    if(VPL_THREADING)
+      list(APPEND _vpl_libs "gomp")
+    endif()
+
+    list(APPEND _vpl_libs pthread m dl)
+
+    set(VendorPerfLibs_LIBRARIES ${_vpl_libs} PARENT_SCOPE)
+    set(VendorPerfLibs_FOUND_LIBRARIES TRUE PARENT_SCOPE)
+  else()
+    set(VendorPerfLibs_FOUND_LIBRARIES FALSE PARENT_SCOPE)
+  endif()
+endfunction()
+
 
 if(NOT VendorPerfLibs_FOUND_LIBRARIES AND NOT VPL_Name OR VPL_Name STREQUAL "IntelMKL")
   find_VPL_MKL()
@@ -279,6 +389,9 @@ if(NOT VendorPerfLibs_FOUND_LIBRARIES AND NOT VPL_Name OR VPL_Name STREQUAL "NVP
 endif()
 if(NOT VendorPerfLibs_FOUND_LIBRARIES AND NOT VPL_Name OR VPL_Name STREQUAL "ARMPL")
   find_VPL_ARMPL()
+endif()
+if(NOT VendorPerfLibs_FOUND_LIBRARIES AND NOT VPL_Name OR VPL_Name STREQUAL "AOCL")
+  find_VPL_AOCL()
 endif()
 
 set(_vpl_required_vars VendorPerfLibs_INCLUDE_DIR VendorPerfLibs_FOUND_LIBRARIES)
