@@ -50,18 +50,20 @@ function(find_VPL_MKL)
   )
 
   # Try to find FFTW3 include directory
-  find_path(VendorPerfLibs_FFTW3_INCLUDE_DIR NAMES fftw3.f03
-    HINTS
-      "${MKL_ROOT}/include"
-      "$ENV{MKLROOT}/include"
-      "$ENV{MKL_ROOT}/include"
-    PATHS
-      /opt/intel/oneapi/mkl/latest/include
-      /opt/intel/mkl/include
-      /usr/include/mkl
-      /usr/include
-    PATH_SUFFIXES fftw
-  )
+  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+    find_path(VendorPerfLibs_FFTW3_INCLUDE_DIR NAMES fftw3.f03
+      HINTS
+        "${MKL_ROOT}/include"
+        "$ENV{MKLROOT}/include"
+        "$ENV{MKL_ROOT}/include"
+      PATHS
+        /opt/intel/oneapi/mkl/latest/include
+        /opt/intel/mkl/include
+        /usr/include/mkl
+        /usr/include
+      PATH_SUFFIXES fftw
+    )
+  endif()
 
   get_filename_component(VendorPerfLibs_LIB_DIR "${MKL_CORE_LIB}" DIRECTORY)
 
@@ -99,32 +101,6 @@ function(find_VPL_MKL)
 endfunction()
 
 function(find_VPL_NVPL)
-  # Determine thread suffix
-  if(NOT VPL_THREADING)
-    set(NVPL_THREAD_SUFFIX "seq")
-  else()
-    set(NVPL_THREAD_SUFFIX "gomp")
-  endif()
-
-  set(NVPL_INTERFACE_SUFFIX "lp64")
-
-  # Try to find the constituent libraries
-  find_library(NVPL_BLAS_LIB NAMES nvpl_blas_${NVPL_INTERFACE_SUFFIX}_${NVPL_THREAD_SUFFIX}
-    HINTS
-      "${NVPL_ROOT}/lib"
-      "$ENV{nvpl_ROOT}/lib"
-      "$ENV{NVPL_ROOT}/lib"
-    PATHS
-      /opt/nvidia/nvpl/lib
-      /usr/lib/aarch64-linux-gnu
-      /usr/lib
-  )
-
-  if(NOT NVPL_BLAS_LIB)
-    set(VendorPerfLibs_FOUND_LIBRARIES FALSE PARENT_SCOPE)
-    return()
-  endif()
-
   # Try to find NVPL include directory
   find_path(VendorPerfLibs_INCLUDE_DIR NAMES nvpl_blas.h
     HINTS
@@ -136,32 +112,100 @@ function(find_VPL_NVPL)
       /usr/include
   )
 
+  # Determine thread suffix
+  if(NOT VPL_THREADING)
+    set(NVPL_THREAD_SUFFIX "seq")
+  else()
+    set(NVPL_THREAD_SUFFIX "gomp")
+  endif()
+
+  set(NVPL_INTERFACE_SUFFIX "lp64")
+
+  # Try to find the constituent libraries
+  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "blas" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+    find_library(NVPL_BLAS_LIB NAMES nvpl_blas_${NVPL_INTERFACE_SUFFIX}_${NVPL_THREAD_SUFFIX}
+      HINTS
+        "${NVPL_ROOT}/lib"
+        "$ENV{nvpl_ROOT}/lib"
+        "$ENV{NVPL_ROOT}/lib"
+      PATHS
+        /opt/nvidia/nvpl/lib
+        /usr/lib/aarch64-linux-gnu
+        /usr/lib
+    )
+  endif()
+
+
   # Try to find FFTW3 include directory
-  find_path(VendorPerfLibs_FFTW3_INCLUDE_DIR NAMES nvpl_fftw.h fftw3.f03
-    HINTS
-      "${NVPL_ROOT}/include"
-      "$ENV{nvpl_ROOT}/include"
-      "$ENV{NVPL_ROOT}/include"
-    PATHS
-      /opt/nvidia/nvpl/include
-      /usr/include
-    PATH_SUFFIXES fftw
-  )
+  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+    find_path(VendorPerfLibs_FFTW3_INCLUDE_DIR NAMES nvpl_fftw.h fftw3.f03
+      HINTS
+        "${NVPL_ROOT}/include"
+        "$ENV{nvpl_ROOT}/include"
+        "$ENV{NVPL_ROOT}/include"
+      PATHS
+        /opt/nvidia/nvpl/include
+        /usr/include
+      PATH_SUFFIXES fftw
+    )
+  endif()
 
-  get_filename_component(VendorPerfLibs_LIB_DIR "${NVPL_BLAS_LIB}" DIRECTORY)
+  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+    find_library(NVPL_LAPACK_LIB NAMES nvpl_lapack_${NVPL_INTERFACE_SUFFIX}_${NVPL_THREAD_SUFFIX}
+      HINTS
+        "${NVPL_ROOT}/lib"
+        "$ENV{nvpl_ROOT}/lib"
+        "$ENV{NVPL_ROOT}/lib"
+      PATHS
+        /opt/nvidia/nvpl/lib
+        /usr/lib/aarch64-linux-gnu
+        /usr/lib
+    )
+  endif()
 
-  find_library(NVPL_LAPACK_LIB NAMES nvpl_lapack_${NVPL_INTERFACE_SUFFIX}_${NVPL_THREAD_SUFFIX}
-    PATHS "${VendorPerfLibs_LIB_DIR}"
-    NO_DEFAULT_PATH
-  )
+  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+    find_library(NVPL_FFTW_LIB NAMES nvpl_fftw
+      HINTS
+        "${NVPL_ROOT}/lib"
+        "$ENV{nvpl_ROOT}/lib"
+        "$ENV{NVPL_ROOT}/lib"
+      PATHS
+        /opt/nvidia/nvpl/lib
+        /usr/lib/aarch64-linux-gnu
+        /usr/lib
+    )
+  endif()
 
-  find_library(NVPL_FFTW_LIB NAMES nvpl_fftw
-    PATHS "${VendorPerfLibs_LIB_DIR}"
-    NO_DEFAULT_PATH
-  )
+  set(_nvpl_found TRUE)
+  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "blas" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+    if(NOT NVPL_BLAS_LIB)
+      set(_nvpl_found FALSE)
+    endif()
+  endif()
+  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+    if(NOT NVPL_LAPACK_LIB)
+      set(_nvpl_found FALSE)
+    endif()
+  endif()
+  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+    if(NOT NVPL_FFTW_LIB)
+      set(_nvpl_found FALSE)
+    endif()
+  endif()
 
-  if(NVPL_BLAS_LIB AND NVPL_LAPACK_LIB AND NVPL_FFTW_LIB)
-    set(VendorPerfLibs_LIBRARIES ${NVPL_LAPACK_LIB} ${NVPL_BLAS_LIB} ${NVPL_FFTW_LIB} pthread m dl PARENT_SCOPE)
+  if(_nvpl_found)
+    set(_vpl_libs)
+    if(NOT VendorPerfLibs_FIND_COMPONENTS OR "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+      list(APPEND _vpl_libs ${NVPL_LAPACK_LIB})
+    endif()
+    if(NOT VendorPerfLibs_FIND_COMPONENTS OR "blas" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+      list(APPEND _vpl_libs ${NVPL_BLAS_LIB})
+    endif()
+    if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+      list(APPEND _vpl_libs ${NVPL_FFTW_LIB})
+    endif()
+    list(APPEND _vpl_libs pthread m dl)
+    set(VendorPerfLibs_LIBRARIES ${_vpl_libs} PARENT_SCOPE)
     set(VendorPerfLibs_FOUND_LIBRARIES TRUE PARENT_SCOPE)
   else()
     set(VendorPerfLibs_FOUND_LIBRARIES FALSE PARENT_SCOPE)
@@ -175,35 +219,46 @@ if(NOT VendorPerfLibs_FOUND_LIBRARIES AND NOT VPL_Name OR VPL_Name STREQUAL "NVP
   find_VPL_NVPL()
 endif()
 
+set(_vpl_required_vars VendorPerfLibs_INCLUDE_DIR VendorPerfLibs_FOUND_LIBRARIES)
+if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+  list(APPEND _vpl_required_vars VendorPerfLibs_FFTW3_INCLUDE_DIR)
+endif()
+
 find_package_handle_standard_args(VendorPerfLibs
-  REQUIRED_VARS VendorPerfLibs_INCLUDE_DIR VendorPerfLibs_FFTW3_INCLUDE_DIR VendorPerfLibs_FOUND_LIBRARIES
+  REQUIRED_VARS ${_vpl_required_vars}
 )
 
 if(VendorPerfLibs_FOUND)
   # Create VPL::blas
-  if(NOT TARGET VPL::blas)
-    add_library(VPL::blas INTERFACE IMPORTED)
-    set_target_properties(VPL::blas PROPERTIES
-      INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR}"
-      INTERFACE_LINK_LIBRARIES "${VendorPerfLibs_LIBRARIES}"
-    )
+  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "blas" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+    if(NOT TARGET VPL::blas)
+      add_library(VPL::blas INTERFACE IMPORTED)
+      set_target_properties(VPL::blas PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR}"
+        INTERFACE_LINK_LIBRARIES "${VendorPerfLibs_LIBRARIES}"
+      )
+    endif()
   endif()
 
   # Create VPL::lapack
-  if(NOT TARGET VPL::lapack)
-    add_library(VPL::lapack INTERFACE IMPORTED)
-    set_target_properties(VPL::lapack PROPERTIES
-      INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR}"
-      INTERFACE_LINK_LIBRARIES "${VendorPerfLibs_LIBRARIES}"
-    )
+  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+    if(NOT TARGET VPL::lapack)
+      add_library(VPL::lapack INTERFACE IMPORTED)
+      set_target_properties(VPL::lapack PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR}"
+        INTERFACE_LINK_LIBRARIES "${VendorPerfLibs_LIBRARIES}"
+      )
+    endif()
   endif()
 
   # Create VPL::fft
-  if(NOT TARGET VPL::fft)
-    add_library(VPL::fft INTERFACE IMPORTED)
-    set_target_properties(VPL::fft PROPERTIES
-      INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR};${VendorPerfLibs_FFTW3_INCLUDE_DIR}"
-      INTERFACE_LINK_LIBRARIES "${VendorPerfLibs_LIBRARIES}"
-    )
+  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+    if(NOT TARGET VPL::fft)
+      add_library(VPL::fft INTERFACE IMPORTED)
+      set_target_properties(VPL::fft PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR};${VendorPerfLibs_FFTW3_INCLUDE_DIR}"
+        INTERFACE_LINK_LIBRARIES "${VendorPerfLibs_LIBRARIES}"
+      )
+    endif()
   endif()
 endif()
