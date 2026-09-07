@@ -40,42 +40,34 @@ function(find_VPL_MKL)
       /usr/include
   )
 
-  set(VendorPerfLibs_INTERFACE_NAME mkl_gf_lp64)
-  if(CMAKE_Fortran_COMPILER_LOADED)
-    if(CMAKE_Fortran_COMPILER_ID MATCHES "^(Intel|IntelLLVM)$" OR CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
-      set(VendorPerfLibs_INTERFACE_NAME mkl_intel_lp64)
+  if(VendorPerfLibs_CORE_LIB)
+    get_filename_component(VendorPerfLibs_LIB_DIR "${VendorPerfLibs_CORE_LIB}" DIRECTORY)
+
+    set(VendorPerfLibs_INTERFACE_NAME mkl_gf_lp64)
+    if(CMAKE_Fortran_COMPILER_LOADED)
+      if(CMAKE_Fortran_COMPILER_ID MATCHES "^(Intel|IntelLLVM)$" OR CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+        set(VendorPerfLibs_INTERFACE_NAME mkl_intel_lp64)
+      endif()
     endif()
+
+    find_library(VendorPerfLibs_INTERFACE_LIB NAMES ${VendorPerfLibs_INTERFACE_NAME}
+      PATHS "${VendorPerfLibs_LIB_DIR}"
+      NO_DEFAULT_PATH
+    )
+
+    if(NOT VPL_THREADING)
+      set(VendorPerfLibs_THREAD_NAMES mkl_sequential)
+    elseif(VPL_THREADING STREQUAL "iomp5")
+      set(VendorPerfLibs_THREAD_NAMES mkl_intel_thread)
+    else()
+      set(VendorPerfLibs_THREAD_NAMES mkl_gnu_thread)
+    endif()
+
+    find_library(VendorPerfLibs_THREAD_LIB NAMES ${VendorPerfLibs_THREAD_NAMES}
+      PATHS "${VendorPerfLibs_LIB_DIR}"
+      NO_DEFAULT_PATH
+    )
   endif()
-
-  find_library(VendorPerfLibs_INTERFACE_LIB NAMES ${VendorPerfLibs_INTERFACE_NAME}
-    HINTS
-      "${MKL_ROOT}/lib/intel64"
-      "$ENV{MKLROOT}/lib/intel64"
-      "$ENV{MKL_ROOT}/lib/intel64"
-    PATHS
-      /opt/intel/oneapi/mkl/latest/lib/intel64
-      /opt/intel/mkl/lib/intel64
-      /usr/lib/x86_64-linux-gnu
-  )
-
-  if(NOT VPL_THREADING)
-    set(VendorPerfLibs_THREAD_NAMES mkl_sequential)
-  elseif(VPL_THREADING STREQUAL "iomp5")
-    set(VendorPerfLibs_THREAD_NAMES mkl_intel_thread)
-  else()
-    set(VendorPerfLibs_THREAD_NAMES mkl_gnu_thread)
-  endif()
-
-  find_library(VendorPerfLibs_THREAD_LIB NAMES ${VendorPerfLibs_THREAD_NAMES}
-    HINTS
-      "${MKL_ROOT}/lib/intel64"
-      "$ENV{MKLROOT}/lib/intel64"
-      "$ENV{MKL_ROOT}/lib/intel64"
-    PATHS
-      /opt/intel/oneapi/mkl/latest/lib/intel64
-      /opt/intel/mkl/lib/intel64
-      /usr/lib/x86_64-linux-gnu
-  )
 
   if(VendorPerfLibs_CORE_LIB AND VendorPerfLibs_INTERFACE_LIB AND VendorPerfLibs_THREAD_LIB)
     set(VendorPerfLibs_LIBRARIES ${VendorPerfLibs_INTERFACE_LIB} ${VendorPerfLibs_THREAD_LIB} ${VendorPerfLibs_CORE_LIB} pthread m dl PARENT_SCOPE)
