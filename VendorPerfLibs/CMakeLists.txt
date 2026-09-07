@@ -5,6 +5,7 @@ project(VendorPerfLibsTest LANGUAGES Fortran)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
 
 # Find our custom VendorPerfLibs
+#set(VPL_THREADING gomp)
 find_package(VendorPerfLibs REQUIRED)
 
 # Enable CTest
@@ -18,3 +19,5 @@ target_link_libraries(test_blas_zdotc PRIVATE VPL::blas)
 
 # Add the test
 add_test(NAME test_blas_zdotc COMMAND test_blas_zdotc)
+
+#find_package(VendorPerfLibs REQUIRED COMPONENTS fft)
