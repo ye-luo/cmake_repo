@@ -34,7 +34,7 @@
 # - VPL::fft
 #
 # Input variables:
-# - VPL_Name: Specifies the vendor performance library to search for. Acceptable values are:
+# - VPL_ID: Specifies the vendor performance library to search for. Acceptable values are:
 #     - unset      : Search any vendor libraries
 #     - "IntelMKL" : Intel Math Kernel Library
 #     - "NVPL"     : NVIDIA Performance Libraries
@@ -48,9 +48,9 @@
 
 include(FindPackageHandleStandardArgs)
 
-set(_VPL_VALID_NAMES "" "IntelMKL" "NVPL" "ARMPL" "AOCL")
-if(DEFINED VPL_Name AND NOT VPL_Name IN_LIST _VPL_VALID_NAMES)
-  message(FATAL_ERROR "VendorPerfLibs: Unknown VPL_Name '${VPL_Name}'. Acceptable values are: unset, 'IntelMKL', 'NVPL', 'ARMPL', 'AOCL'")
+set(_VPL_VALID_IDS "" "IntelMKL" "NVPL" "ARMPL" "AOCL")
+if(DEFINED VPL_ID AND NOT VPL_ID IN_LIST _VPL_VALID_IDS)
+  message(FATAL_ERROR "VendorPerfLibs: Unknown VPL_ID '${VPL_ID}'. Acceptable values are: unset, 'IntelMKL', 'NVPL', 'ARMPL', 'AOCL'")
 endif()
 
 set(_VPL_VALID_THREADINGS "" "gomp" "iomp5")
@@ -136,6 +136,7 @@ function(find_VPL_MKL)
     list(APPEND _vpl_libs pthread m dl)
     set(VendorPerfLibs_LIBRARIES ${_vpl_libs} PARENT_SCOPE)
     set(VendorPerfLibs_FOUND_LIBRARIES TRUE PARENT_SCOPE)
+    set(VPL_ID "IntelMKL" CACHE STRING "Vendor Performance Library ID (unset, IntelMKL, NVPL, ARMPL, AOCL)" FORCE)
   else()
     set(VendorPerfLibs_FOUND_LIBRARIES FALSE PARENT_SCOPE)
   endif()
@@ -243,6 +244,7 @@ function(find_VPL_NVPL)
     list(APPEND _vpl_libs pthread m dl)
     set(VendorPerfLibs_LIBRARIES ${_vpl_libs} PARENT_SCOPE)
     set(VendorPerfLibs_FOUND_LIBRARIES TRUE PARENT_SCOPE)
+    set(VPL_ID "NVPL" CACHE STRING "Vendor Performance Library ID (unset, IntelMKL, NVPL, ARMPL, AOCL)" FORCE)
   else()
     set(VendorPerfLibs_FOUND_LIBRARIES FALSE PARENT_SCOPE)
   endif()
@@ -299,6 +301,7 @@ function(find_VPL_ARMPL)
     list(APPEND _vpl_libs pthread m dl)
     set(VendorPerfLibs_LIBRARIES ${_vpl_libs} PARENT_SCOPE)
     set(VendorPerfLibs_FOUND_LIBRARIES TRUE PARENT_SCOPE)
+    set(VPL_ID "ARMPL" CACHE STRING "Vendor Performance Library ID (unset, IntelMKL, NVPL, ARMPL, AOCL)" FORCE)
   else()
     set(VendorPerfLibs_FOUND_LIBRARIES FALSE PARENT_SCOPE)
   endif()
@@ -400,6 +403,7 @@ function(find_VPL_AOCL)
 
     set(VendorPerfLibs_LIBRARIES ${_vpl_libs} PARENT_SCOPE)
     set(VendorPerfLibs_FOUND_LIBRARIES TRUE PARENT_SCOPE)
+    set(VPL_ID "AOCL" CACHE STRING "Vendor Performance Library ID (unset, IntelMKL, NVPL, ARMPL, AOCL)" FORCE)
   else()
     set(VendorPerfLibs_FOUND_LIBRARIES FALSE PARENT_SCOPE)
   endif()
@@ -407,17 +411,17 @@ endfunction()
 
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
-  if(NOT VPL_Name OR VPL_Name STREQUAL "IntelMKL")
+  if(NOT VPL_ID OR VPL_ID STREQUAL "IntelMKL")
     find_VPL_MKL()
   endif()
-  if(NOT VPL_Name OR VPL_Name STREQUAL "AOCL")
+  if(NOT VPL_ID OR VPL_ID STREQUAL "AOCL")
     find_VPL_AOCL()
   endif()
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
-  if(NOT VPL_Name OR VPL_Name STREQUAL "NVPL")
+  if(NOT VPL_ID OR VPL_ID STREQUAL "NVPL")
     find_VPL_NVPL()
   endif()
-  if(NOT VPL_Name OR VPL_Name STREQUAL "ARMPL")
+  if(NOT VPL_ID OR VPL_ID STREQUAL "ARMPL")
     find_VPL_ARMPL()
   endif()
 endif()
