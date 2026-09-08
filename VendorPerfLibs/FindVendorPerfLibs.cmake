@@ -68,9 +68,6 @@ macro(speculateVendor)
       "${MKL_ROOT}/lib/intel64"
       "$ENV{MKLROOT}/lib/intel64"
       "$ENV{MKL_ROOT}/lib/intel64"
-    PATHS
-      /opt/intel/oneapi/mkl/latest/lib/intel64
-      /opt/intel/mkl/lib/intel64
   )
 
   if(_MKL_CORE_TEST_LIB)
@@ -96,9 +93,6 @@ endif()
 macro(find_VPL_blas)
   set(VPL_blas_ID ${VPL_ID} CACHE STRING "Vendor BLAS ID (IntelMKL, Generic)")
   check_VPL_ID("VPL_blas_ID" "${VPL_blas_ID}")
-if(NOT VendorPerfLibs_FIND_QUIETLY)
-  message(STATUS "Searching for Vendor BLAS. Requested VPL_blas_ID '${VPL_blas_ID}'")
-endif()
 
   if(VPL_blas_ID STREQUAL "IntelMKL")
     if(NOT VPL_OMP)
@@ -113,22 +107,25 @@ endif()
         "${MKL_ROOT}/include"
         "$ENV{MKLROOT}/include"
         "$ENV{MKL_ROOT}/include"
-      PATHS
-        /opt/intel/oneapi/mkl/latest/include
-        /opt/intel/mkl/include
       PATH_SUFFIXES mkl
     )
+    # GNU and LLVMFlang families of compilers follow modern C99 _Complex ABI convention.
+    # Intel, IntelLLVM, NVHPC follows the legacy convention.
+    if(BLAS_FOUND AND CMAKE_Fortran_COMPILER_LOADED AND NOT (CMAKE_Fortran_COMPILER_ID MATCHES "^Intel" OR CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") AND NOT APPLE)
+      string(REPLACE "mkl_intel_lp64" "mkl_gf_lp64" BLAS_LIBRARIES "${BLAS_LIBRARIES}")
+    endif()
   else()
     find_package(BLAS ${_find_package_args})
+  endif()
+
+  if(NOT VendorPerfLibs_FIND_QUIETLY)
+    message(STATUS "Requested VPL_blas_ID '${VPL_blas_ID}' found or not: ${BLAS_FOUND}")
   endif()
 endmacro()
 
 macro(find_VPL_lapack)
   set(VPL_lapack_ID ${VPL_ID} CACHE STRING "Vendor LAPACK ID (IntelMKL, Generic)")
   check_VPL_ID("VPL_lapack_ID" "${VPL_lapack_ID}")
-if(NOT VendorPerfLibs_FIND_QUIETLY)
-  message(STATUS "Searching for Vendor LAPACK. Requested VPL_lapack_ID '${VPL_lapack_ID}'")
-endif()
 
   if(VPL_lapack_ID STREQUAL "IntelMKL")
     if(NOT VPL_OMP)
@@ -140,6 +137,10 @@ endif()
   else()
     find_package(LAPACK ${_find_package_args})
   endif()
+
+  if(NOT VendorPerfLibs_FIND_QUIETLY)
+    message(STATUS "Requested VPL_lapack_ID '${VPL_lapack_ID}' found or not: ${LAPACK_FOUND}")
+  endif()
 endmacro()
 
 macro(find_VPL_fft)
@@ -149,6 +150,7 @@ if(NOT VendorPerfLibs_FIND_QUIETLY)
   message(STATUS "Searching for Vendor FFT. Requested VPL_fft_ID '${VPL_fft_ID}'")
 endif()
 
+  set(VPL_FFT_FOUND FALSE)
   if(VPL_fft_ID STREQUAL "IntelMKL")
     find_path(VendorPerfLibs_FFTW3_INCLUDE_DIR NAMES fftw3.f03
       HINTS
@@ -161,9 +163,15 @@ endif()
       PATH_SUFFIXES fftw mkl/fftw
     )
     set(FFT_LIBRARIES ${BLAS_LIBRARIES})
+    if(VendorPerfLibs_FFTW3_INCLUDE_DIR)
+      set(VPL_FFT_FOUND TRUE)
+    endif()
   else()
     # search for fftw3
     find_path(VendorPerfLibs_FFTW3_INCLUDE_DIR NAMES fftw3.f03 fftw3.h)
+    if(VendorPerfLibs_FFTW3_INCLUDE_DIR)
+      set(VPL_FFT_FOUND TRUE)
+    endif()
 
     set(FFT_LIBRARIES "")
     if(VPL_OMP)
@@ -176,6 +184,10 @@ endif()
     if(FFTW3_LIBRARY)
       list(APPEND FFT_LIBRARIES ${FFTW3_LIBRARY})
     endif()
+  endif()
+
+  if(NOT VendorPerfLibs_FIND_QUIETLY)
+    message(STATUS "Requested VPL_fft_ID '${VPL_lapack_ID}' found or not: ${VPL_FFT_FOUND}")
   endif()
 endmacro()
 
