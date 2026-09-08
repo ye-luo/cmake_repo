@@ -36,10 +36,7 @@
 # - VPL_ID: Specifies the vendor performance library to search for. Acceptable values are:
 #     - "IntelMKL" : Intel Math Kernel Library
 #     - "Generic"  : Generic BLAS/LAPACK/FFT
-# - VPL_THREADING: Specifies the threading layer to use. Acceptable values are:
-#     - unset    : Sequential (mkl_sequential) - default
-#     - "gomp"   : GCC's libgomp, or any OpenMP runtime providing a compatibility layer for it
-#     - "iomp5"  : Intel's libiomp5, or any OpenMP runtime providing a compatibility layer for it
+# - VPL_OMP: A boolean specifying the threading layer to use. If ON, OpenMP threading is used. If OFF (default), sequential is used.
 #
 
 include(FindPackageHandleStandardArgs)
@@ -47,6 +44,16 @@ include(FindPackageHandleStandardArgs)
 if(NOT (CMAKE_C_COMPILER_LOADED OR CMAKE_CXX_COMPILER_LOADED))
   message(FATAL_ERROR "VendorPerfLibs: C or CXX compiler must be loaded before calling find_package(VendorPerfLibs)")
 endif()
+
+option(VPL_OMP "Use OpenMP threading for Vendor Performance Libraries" OFF)
+if(NOT VendorPerfLibs_FIND_QUIETLY)
+  if(VPL_OMP)
+    message(STATUS "Requested OpenMP threaded Vendor Performance Libraries")
+  else()
+    message(STATUS "Requested non-threaded Vendor Performance Libraries")
+  endif()
+endif()
+
 
 set(_VPL_VALID_IDS "IntelMKL" "Generic")
 function(check_VPL_ID var_name id_to_check)
@@ -84,19 +91,6 @@ if(NOT VendorPerfLibs_FIND_QUIETLY)
   message(STATUS "Searching for Vendor Performance Libraries. Requested VPL_ID '${VPL_ID}'")
 endif()
 
-set(_VPL_VALID_THREADINGS "" "gomp" "iomp5")
-if(DEFINED VPL_THREADING AND NOT VPL_THREADING IN_LIST _VPL_VALID_THREADINGS)
-  message(FATAL_ERROR "VendorPerfLibs: Unknown VPL_THREADING '${VPL_THREADING}'. Acceptable values are: unset, 'gomp', 'iomp5'")
-endif()
-
-if(NOT VendorPerfLibs_FIND_QUIETLY)
-  if(VPL_THREADING)
-    message(STATUS "Requested threading layer: ${VPL_THREADING}")
-  else()
-    message(STATUS "Requested non-threaded Vendor Performance Libraries.")
-  endif()
-endif()
-
 set(_find_package_args)
 if(VendorPerfLibs_FIND_QUIETLY)
   list(APPEND _find_package_args QUIET REQUIRED)
@@ -107,7 +101,7 @@ macro(find_VPL_blas)
   check_VPL_ID("VPL_blas_ID" "${VPL_blas_ID}")
 
   if(VPL_blas_ID STREQUAL "IntelMKL")
-    if(NOT VPL_THREADING)
+    if(NOT VPL_OMP)
       set(BLA_VENDOR "Intel10_64lp_seq")
     else()
       set(BLA_VENDOR "Intel10_64lp")
@@ -134,7 +128,7 @@ macro(find_VPL_lapack)
   check_VPL_ID("VPL_lapack_ID" "${VPL_lapack_ID}")
 
   if(VPL_lapack_ID STREQUAL "IntelMKL")
-    if(NOT VPL_THREADING)
+    if(NOT VPL_OMP)
       set(BLA_VENDOR "Intel10_64lp_seq")
     else()
       set(BLA_VENDOR "Intel10_64lp")
