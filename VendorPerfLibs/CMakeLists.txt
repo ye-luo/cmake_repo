@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(VendorPerfLibsTest LANGUAGES Fortran)
+project(VendorPerfLibsTest LANGUAGES Fortran C)
 
 # Append current directory to CMAKE_MODULE_PATH so find_package can find FindVendorPerfLibs.cmake
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -20,4 +20,4 @@ target_link_libraries(test_blas_zdotc PRIVATE VPL::blas)
 # Add the test
 add_test(NAME test_blas_zdotc COMMAND test_blas_zdotc)
 
-#find_package(VendorPerfLibs REQUIRED COMPONENTS fft)
+find_package(VendorPerfLibs REQUIRED COMPONENTS fft)

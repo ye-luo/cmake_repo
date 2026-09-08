@@ -29,14 +29,13 @@
 # FindVendorPerfLibs.cmake
 #
 # Searches for Intel MKL and creates the following CMake interface targets:
-# - VPL::blas
 # - VPL::lapack
 # - VPL::fft
 #
 # Input variables:
 # - VPL_ID: Specifies the vendor performance library to search for. Acceptable values are:
-#     - unset      : Search any vendor libraries
 #     - "IntelMKL" : Intel Math Kernel Library
+#     - "Generic"  : Generic BLAS/LAPACK/FFT
 # - VPL_THREADING: Specifies the threading layer to use. Acceptable values are:
 #     - unset    : Sequential (mkl_sequential) - default
 #     - "gomp"   : GCC's libgomp, or any OpenMP runtime providing a compatibility layer for it
@@ -45,17 +44,44 @@
 
 include(FindPackageHandleStandardArgs)
 
-set(_VPL_VALID_IDS "" "IntelMKL")
-if(DEFINED VPL_ID AND NOT VPL_ID IN_LIST _VPL_VALID_IDS)
-  message(FATAL_ERROR "VendorPerfLibs: Unknown VPL_ID '${VPL_ID}'. Acceptable values are: unset, 'IntelMKL'")
+if(NOT (CMAKE_C_COMPILER_LOADED OR CMAKE_CXX_COMPILER_LOADED))
+  message(FATAL_ERROR "VendorPerfLibs: C or CXX compiler must be loaded before calling find_package(VendorPerfLibs)")
 endif()
 
-if(NOT VendorPerfLibs_FIND_QUIETLY)
-  if(VPL_ID)
-    message(STATUS "Searching for Vendor Performance Libraries. Requested VPL_ID '${VPL_ID}'")
-  else()
-    message(STATUS "Exploring Vendor Performance Libraries.")
+set(_VPL_VALID_IDS "IntelMKL" "Generic")
+function(check_VPL_ID var_name id_to_check)
+  if(NOT id_to_check IN_LIST _VPL_VALID_IDS)
+    message(FATAL_ERROR "VendorPerfLibs: Unknown ${var_name} '${id_to_check}'. Acceptable values are: 'IntelMKL', 'Generic'")
   endif()
+endfunction()
+
+macro(speculateVendor)
+  find_library(_MKL_CORE_TEST_LIB NAMES mkl_core
+    HINTS
+      "${MKL_ROOT}/lib/intel64"
+      "$ENV{MKLROOT}/lib/intel64"
+      "$ENV{MKL_ROOT}/lib/intel64"
+    PATHS
+      /opt/intel/oneapi/mkl/latest/lib/intel64
+      /opt/intel/mkl/lib/intel64
+  )
+
+  if(_MKL_CORE_TEST_LIB)
+    set(VPL_ID_GUESS "IntelMKL")
+  else()
+    set(VPL_ID_GUESS "Generic")
+  endif()
+endmacro()
+
+if(NOT VPL_ID)
+  speculateVendor()
+else()
+  check_VPL_ID("VPL_ID" "${VPL_ID}")
+endif()
+
+set(VPL_ID "${VPL_ID_GUESS}" CACHE STRING "Vendor Performance Library ID (IntelMKL, Generic)")
+if(NOT VendorPerfLibs_FIND_QUIETLY)
+  message(STATUS "Searching for Vendor Performance Libraries. Requested VPL_ID '${VPL_ID}'")
 endif()
 
 set(_VPL_VALID_THREADINGS "" "gomp" "iomp5")
@@ -71,37 +97,58 @@ if(NOT VendorPerfLibs_FIND_QUIETLY)
   endif()
 endif()
 
-function(find_VPL_MKL)
-  # Try to find the constituent libraries
-  find_library(MKL_CORE_LIB NAMES mkl_core
-    HINTS
-      "${MKL_ROOT}/lib/intel64"
-      "$ENV{MKLROOT}/lib/intel64"
-      "$ENV{MKL_ROOT}/lib/intel64"
-    PATHS
-      /opt/intel/oneapi/mkl/latest/lib/intel64
-      /opt/intel/mkl/lib/intel64
-  )
+set(_find_package_args)
+if(VendorPerfLibs_FIND_QUIETLY)
+  list(APPEND _find_package_args QUIET REQUIRED)
+endif()
 
-  if(NOT MKL_CORE_LIB)
-    set(VendorPerfLibs_FOUND_LIBRARIES FALSE PARENT_SCOPE)
-    return()
+macro(find_VPL_blas)
+  set(VPL_blas_ID ${VPL_ID} CACHE STRING "Vendor BLAS ID (IntelMKL, Generic)")
+  check_VPL_ID("VPL_blas_ID" "${VPL_blas_ID}")
+
+  if(VPL_blas_ID STREQUAL "IntelMKL")
+    if(NOT VPL_THREADING)
+      set(BLA_VENDOR "Intel10_64lp_seq")
+    else()
+      set(BLA_VENDOR "Intel10_64lp")
+    endif()
+    find_package(BLAS ${_find_package_args})
+    # Try to find MKL include directory
+    find_path(VendorPerfLibs_INCLUDE_DIR NAMES mkl.h
+      HINTS
+        "${MKL_ROOT}/include"
+        "$ENV{MKLROOT}/include"
+        "$ENV{MKL_ROOT}/include"
+      PATHS
+        /opt/intel/oneapi/mkl/latest/include
+        /opt/intel/mkl/include
+      PATH_SUFFIXES mkl
+    )
+  else()
+    find_package(BLAS ${_find_package_args})
   endif()
+endmacro()
 
-  # Try to find MKL include directory
-  find_path(VendorPerfLibs_INCLUDE_DIR NAMES mkl.h
-    HINTS
-      "${MKL_ROOT}/include"
-      "$ENV{MKLROOT}/include"
-      "$ENV{MKL_ROOT}/include"
-    PATHS
-      /opt/intel/oneapi/mkl/latest/include
-      /opt/intel/mkl/include
-    PATH_SUFFIXES mkl
-  )
+macro(find_VPL_lapack)
+  set(VPL_lapack_ID ${VPL_ID} CACHE STRING "Vendor LAPACK ID (IntelMKL, Generic)")
+  check_VPL_ID("VPL_lapack_ID" "${VPL_lapack_ID}")
 
-  # Try to find FFTW3 include directory
-  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+  if(VPL_lapack_ID STREQUAL "IntelMKL")
+    if(NOT VPL_THREADING)
+      set(BLA_VENDOR "Intel10_64lp_seq")
+    else()
+      set(BLA_VENDOR "Intel10_64lp")
+    endif()
+    find_package(LAPACK ${_find_package_args})
+  else()
+    find_package(LAPACK ${_find_package_args})
+  endif()
+endmacro()
+
+macro(find_VPL_fft)
+  set(VPL_fft_ID ${VPL_ID} CACHE STRING "Vendor FFT ID (IntelMKL, Generic)")
+  check_VPL_ID("VPL_fft_ID" "${VPL_fft_ID}")
+
     find_path(VendorPerfLibs_FFTW3_INCLUDE_DIR NAMES fftw3.f03
       HINTS
         "${MKL_ROOT}/include"
@@ -112,62 +159,22 @@ function(find_VPL_MKL)
         /opt/intel/mkl/include
       PATH_SUFFIXES fftw mkl/fftw
     )
-  endif()
+endmacro()
 
-  get_filename_component(VendorPerfLibs_LIB_DIR "${MKL_CORE_LIB}" DIRECTORY)
-
-  set(VendorPerfLibs_INTERFACE_NAME mkl_gf_lp64)
-  if(CMAKE_Fortran_COMPILER_LOADED)
-    if(CMAKE_Fortran_COMPILER_ID MATCHES "^(Intel|IntelLLVM)$" OR CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
-      set(VendorPerfLibs_INTERFACE_NAME mkl_intel_lp64)
-    endif()
-  endif()
-
-  find_library(MKL_INTERFACE_LIB NAMES ${VendorPerfLibs_INTERFACE_NAME}
-    PATHS "${VendorPerfLibs_LIB_DIR}"
-    NO_DEFAULT_PATH
-  )
-
-  if(NOT VPL_THREADING)
-    set(VendorPerfLibs_THREAD_NAMES mkl_sequential)
-  elseif(VPL_THREADING STREQUAL "iomp5")
-    set(VendorPerfLibs_THREAD_NAMES mkl_intel_thread)
-  else()
-    set(VendorPerfLibs_THREAD_NAMES mkl_gnu_thread)
-  endif()
-
-  find_library(MKL_THREAD_LIB NAMES ${VendorPerfLibs_THREAD_NAMES}
-    PATHS "${VendorPerfLibs_LIB_DIR}"
-    NO_DEFAULT_PATH
-  )
-
-  if(MKL_CORE_LIB AND MKL_INTERFACE_LIB AND MKL_THREAD_LIB)
-    set(_vpl_libs ${MKL_INTERFACE_LIB} ${MKL_THREAD_LIB} ${MKL_CORE_LIB})
-    if(VPL_THREADING)
-      list(APPEND _vpl_libs ${VPL_THREADING})
-    endif()
-    list(APPEND _vpl_libs pthread m dl)
-    set(VendorPerfLibs_LIBRARIES ${_vpl_libs} PARENT_SCOPE)
-    set(VendorPerfLibs_FOUND_LIBRARIES TRUE PARENT_SCOPE)
-    set(VPL_ID "IntelMKL" CACHE STRING "Vendor Performance Library ID (unset, IntelMKL)" FORCE)
-  else()
-    set(VendorPerfLibs_FOUND_LIBRARIES FALSE PARENT_SCOPE)
-  endif()
-endfunction()
-
-
-if(VendorPerfLibs_FIND_COMPONENTS AND "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS AND NOT "blas" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-  list(APPEND VendorPerfLibs_FIND_COMPONENTS "blas")
+set(_vpl_required_vars BLAS_LIBRARIES)
+# blas is always searched regardless of request
+find_VPL_blas()
+if(NOT VPL_blas_ID STREQUAL "Generic")
+  list(APPEND _vpl_required_vars VendorPerfLibs_INCLUDE_DIR)
 endif()
 
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
-  if(NOT VPL_ID OR VPL_ID STREQUAL "IntelMKL")
-    find_VPL_MKL()
-  endif()
+if(NOT VendorPerfLibs_FIND_COMPONENTS OR "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+  find_VPL_lapack()
+  list(APPEND _vpl_required_vars LAPACK_LIBRARIES)
 endif()
 
-set(_vpl_required_vars VendorPerfLibs_INCLUDE_DIR VendorPerfLibs_FOUND_LIBRARIES)
 if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+  find_VPL_fft()
   list(APPEND _vpl_required_vars VendorPerfLibs_FFTW3_INCLUDE_DIR)
 endif()
 
@@ -177,14 +184,12 @@ find_package_handle_standard_args(VendorPerfLibs
 
 if(VendorPerfLibs_FOUND)
   # Create VPL::blas
-  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "blas" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-    if(NOT TARGET VPL::blas)
-      add_library(VPL::blas INTERFACE IMPORTED)
-      set_target_properties(VPL::blas PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR}"
-        INTERFACE_LINK_LIBRARIES "${VendorPerfLibs_LIBRARIES}"
-      )
-    endif()
+  if(NOT TARGET VPL::blas)
+    add_library(VPL::blas INTERFACE IMPORTED)
+    set_target_properties(VPL::blas PROPERTIES
+      INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR}"
+      INTERFACE_LINK_LIBRARIES "${BLAS_LIBRARIES}"
+    )
   endif()
 
   # Create VPL::lapack
@@ -193,7 +198,7 @@ if(VendorPerfLibs_FOUND)
       add_library(VPL::lapack INTERFACE IMPORTED)
       set_target_properties(VPL::lapack PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR}"
-        INTERFACE_LINK_LIBRARIES "${VendorPerfLibs_LIBRARIES}"
+        INTERFACE_LINK_LIBRARIES "${LAPACK_LIBRARIES}"
       )
     endif()
   endif()
