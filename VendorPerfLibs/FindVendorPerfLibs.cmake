@@ -87,9 +87,6 @@ else()
 endif()
 
 set(VPL_ID "${VPL_ID_GUESS}" CACHE STRING "Vendor Performance Library ID (IntelMKL, Generic)")
-if(NOT VendorPerfLibs_FIND_QUIETLY)
-  message(STATUS "Searching for Vendor Performance Libraries. Requested VPL_ID '${VPL_ID}'")
-endif()
 
 set(_find_package_args)
 if(VendorPerfLibs_FIND_QUIETLY)
@@ -99,6 +96,9 @@ endif()
 macro(find_VPL_blas)
   set(VPL_blas_ID ${VPL_ID} CACHE STRING "Vendor BLAS ID (IntelMKL, Generic)")
   check_VPL_ID("VPL_blas_ID" "${VPL_blas_ID}")
+if(NOT VendorPerfLibs_FIND_QUIETLY)
+  message(STATUS "Searching for Vendor BLAS. Requested VPL_blas_ID '${VPL_blas_ID}'")
+endif()
 
   if(VPL_blas_ID STREQUAL "IntelMKL")
     if(NOT VPL_OMP)
@@ -126,6 +126,9 @@ endmacro()
 macro(find_VPL_lapack)
   set(VPL_lapack_ID ${VPL_ID} CACHE STRING "Vendor LAPACK ID (IntelMKL, Generic)")
   check_VPL_ID("VPL_lapack_ID" "${VPL_lapack_ID}")
+if(NOT VendorPerfLibs_FIND_QUIETLY)
+  message(STATUS "Searching for Vendor LAPACK. Requested VPL_lapack_ID '${VPL_lapack_ID}'")
+endif()
 
   if(VPL_lapack_ID STREQUAL "IntelMKL")
     if(NOT VPL_OMP)
@@ -142,7 +145,11 @@ endmacro()
 macro(find_VPL_fft)
   set(VPL_fft_ID ${VPL_ID} CACHE STRING "Vendor FFT ID (IntelMKL, Generic)")
   check_VPL_ID("VPL_fft_ID" "${VPL_fft_ID}")
+if(NOT VendorPerfLibs_FIND_QUIETLY)
+  message(STATUS "Searching for Vendor FFT. Requested VPL_fft_ID '${VPL_fft_ID}'")
+endif()
 
+  if(VPL_fft_ID STREQUAL "IntelMKL")
     find_path(VendorPerfLibs_FFTW3_INCLUDE_DIR NAMES fftw3.f03
       HINTS
         "${MKL_ROOT}/include"
@@ -153,6 +160,11 @@ macro(find_VPL_fft)
         /opt/intel/mkl/include
       PATH_SUFFIXES fftw mkl/fftw
     )
+    set(FFT_LIBRARIES ${BLAS_LIBRARIES})
+  else()
+    # search for fftw3
+    set(FFT_LIBRARIES "FIXME")
+  endif()
 endmacro()
 
 set(_vpl_required_vars BLAS_LIBRARIES)
@@ -169,7 +181,7 @@ endif()
 
 if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
   find_VPL_fft()
-  list(APPEND _vpl_required_vars VendorPerfLibs_FFTW3_INCLUDE_DIR)
+  list(APPEND _vpl_required_vars VendorPerfLibs_FFTW3_INCLUDE_DIR FFT_LIBRARIES)
 endif()
 
 find_package_handle_standard_args(VendorPerfLibs
@@ -203,7 +215,7 @@ if(VendorPerfLibs_FOUND)
       add_library(VPL::fft INTERFACE IMPORTED)
       set_target_properties(VPL::fft PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR};${VendorPerfLibs_FFTW3_INCLUDE_DIR}"
-        INTERFACE_LINK_LIBRARIES "${VendorPerfLibs_LIBRARIES}"
+        INTERFACE_LINK_LIBRARIES "${FFT_LIBRARIES}"
       )
     endif()
   endif()
