@@ -37,9 +37,6 @@
 # - VPL_ID: Specifies the vendor performance library to search for. Acceptable values are:
 #     - unset      : Search any vendor libraries
 #     - "IntelMKL" : Intel Math Kernel Library
-#     - "NVPL"     : NVIDIA Performance Libraries
-#     - "ARMPL"    : ARM Performance Libraries
-#     - "AOCL"     : AMD Optimizing CPU Libraries
 # - VPL_THREADING: Specifies the threading layer to use. Acceptable values are:
 #     - unset    : Sequential (mkl_sequential) - default
 #     - "gomp"   : GCC's libgomp, or any OpenMP runtime providing a compatibility layer for it
@@ -48,9 +45,9 @@
 
 include(FindPackageHandleStandardArgs)
 
-set(_VPL_VALID_IDS "" "IntelMKL" "NVPL" "ARMPL" "AOCL")
+set(_VPL_VALID_IDS "" "IntelMKL")
 if(DEFINED VPL_ID AND NOT VPL_ID IN_LIST _VPL_VALID_IDS)
-  message(FATAL_ERROR "VendorPerfLibs: Unknown VPL_ID '${VPL_ID}'. Acceptable values are: unset, 'IntelMKL', 'NVPL', 'ARMPL', 'AOCL'")
+  message(FATAL_ERROR "VendorPerfLibs: Unknown VPL_ID '${VPL_ID}'. Acceptable values are: unset, 'IntelMKL'")
 endif()
 
 if(NOT VendorPerfLibs_FIND_QUIETLY)
@@ -152,281 +149,12 @@ function(find_VPL_MKL)
     list(APPEND _vpl_libs pthread m dl)
     set(VendorPerfLibs_LIBRARIES ${_vpl_libs} PARENT_SCOPE)
     set(VendorPerfLibs_FOUND_LIBRARIES TRUE PARENT_SCOPE)
-    set(VPL_ID "IntelMKL" CACHE STRING "Vendor Performance Library ID (unset, IntelMKL, NVPL, ARMPL, AOCL)" FORCE)
+    set(VPL_ID "IntelMKL" CACHE STRING "Vendor Performance Library ID (unset, IntelMKL)" FORCE)
   else()
     set(VendorPerfLibs_FOUND_LIBRARIES FALSE PARENT_SCOPE)
   endif()
 endfunction()
 
-function(find_VPL_NVPL)
-  # Try to find NVPL include directory
-  find_path(VendorPerfLibs_INCLUDE_DIR NAMES nvpl_blas.h
-    HINTS
-      "${NVPL_ROOT}/include"
-      "$ENV{nvpl_ROOT}/include"
-      "$ENV{NVPL_ROOT}/include"
-    PATHS
-      /opt/nvidia/nvpl/include
-  )
-
-  # Determine thread suffix
-  if(NOT VPL_THREADING)
-    set(NVPL_THREAD_SUFFIX "seq")
-  else()
-    set(NVPL_THREAD_SUFFIX "gomp")
-  endif()
-
-  set(NVPL_INTERFACE_SUFFIX "lp64")
-
-  # Try to find the constituent libraries
-  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "blas" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-    find_library(NVPL_BLAS_LIB NAMES nvpl_blas_${NVPL_INTERFACE_SUFFIX}_${NVPL_THREAD_SUFFIX}
-      HINTS
-        "${NVPL_ROOT}/lib"
-        "$ENV{nvpl_ROOT}/lib"
-        "$ENV{NVPL_ROOT}/lib"
-      PATHS
-        /opt/nvidia/nvpl/lib
-    )
-  endif()
-
-
-  # Try to find FFTW3 include directory
-  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-    find_path(VendorPerfLibs_FFTW3_INCLUDE_DIR NAMES fftw3.f03
-      HINTS
-        "${NVPL_ROOT}/include"
-        "$ENV{nvpl_ROOT}/include"
-        "$ENV{NVPL_ROOT}/include"
-      PATHS
-        /opt/nvidia/nvpl/include
-      PATH_SUFFIXES nvpl_fftw
-    )
-  endif()
-
-  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-    find_library(NVPL_LAPACK_LIB NAMES nvpl_lapack_${NVPL_INTERFACE_SUFFIX}_${NVPL_THREAD_SUFFIX}
-      HINTS
-        "${NVPL_ROOT}/lib"
-        "$ENV{nvpl_ROOT}/lib"
-        "$ENV{NVPL_ROOT}/lib"
-      PATHS
-        /opt/nvidia/nvpl/lib
-    )
-  endif()
-
-  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-    find_library(NVPL_FFTW_LIB NAMES nvpl_fftw
-      HINTS
-        "${NVPL_ROOT}/lib"
-        "$ENV{nvpl_ROOT}/lib"
-        "$ENV{NVPL_ROOT}/lib"
-      PATHS
-        /opt/nvidia/nvpl/lib
-    )
-  endif()
-
-  set(_nvpl_found TRUE)
-  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "blas" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-    if(NOT NVPL_BLAS_LIB)
-      set(_nvpl_found FALSE)
-    endif()
-  endif()
-  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-    if(NOT NVPL_LAPACK_LIB)
-      set(_nvpl_found FALSE)
-    endif()
-  endif()
-  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-    if(NOT NVPL_FFTW_LIB)
-      set(_nvpl_found FALSE)
-    endif()
-  endif()
-
-  if(_nvpl_found)
-    set(_vpl_libs)
-    if(NOT VendorPerfLibs_FIND_COMPONENTS OR "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-      list(APPEND _vpl_libs ${NVPL_LAPACK_LIB})
-    endif()
-    if(NOT VendorPerfLibs_FIND_COMPONENTS OR "blas" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-      list(APPEND _vpl_libs ${NVPL_BLAS_LIB})
-    endif()
-    if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-      list(APPEND _vpl_libs ${NVPL_FFTW_LIB})
-    endif()
-    if(VPL_THREADING)
-      list(APPEND _vpl_libs ${VPL_THREADING})
-    endif()
-    list(APPEND _vpl_libs pthread m dl)
-    set(VendorPerfLibs_LIBRARIES ${_vpl_libs} PARENT_SCOPE)
-    set(VendorPerfLibs_FOUND_LIBRARIES TRUE PARENT_SCOPE)
-    set(VPL_ID "NVPL" CACHE STRING "Vendor Performance Library ID (unset, IntelMKL, NVPL, ARMPL, AOCL)" FORCE)
-  else()
-    set(VendorPerfLibs_FOUND_LIBRARIES FALSE PARENT_SCOPE)
-  endif()
-endfunction()
-
-function(find_VPL_ARMPL)
-  # Determine thread suffix
-  if(NOT VPL_THREADING)
-    set(ARMPL_THREAD_SUFFIX "")
-  else()
-    set(ARMPL_THREAD_SUFFIX "_mp")
-  endif()
-
-  set(ARMPL_INTERFACE_SUFFIX "lp64")
-  set(ARMPL_LIB_NAME armpl_${ARMPL_INTERFACE_SUFFIX}${ARMPL_THREAD_SUFFIX})
-
-  # Try to find ARMPL include directory
-  find_path(VendorPerfLibs_INCLUDE_DIR NAMES armpl.h
-    HINTS
-      "${ARMPL_ROOT}/include"
-      "$ENV{armpl_ROOT}/include"
-      "$ENV{ARMPL_ROOT}/include"
-      "$ENV{ARMPL_DIR}/include"
-    PATHS
-      /opt/arm/armpl/include
-  )
-
-  # Try to find FFTW3 include directory
-  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-    find_path(VendorPerfLibs_FFTW3_INCLUDE_DIR NAMES fftw3.f03
-      HINTS
-        "${ARMPL_ROOT}/include"
-        "$ENV{armpl_ROOT}/include"
-        "$ENV{ARMPL_ROOT}/include"
-        "$ENV{ARMPL_DIR}/include"
-      PATHS
-        /opt/arm/armpl/include
-      PATH_SUFFIXES fftw
-    )
-  endif()
-
-  find_library(ARMPL_LIB NAMES ${ARMPL_LIB_NAME}
-    HINTS
-      "${ARMPL_ROOT}/lib"
-      "$ENV{armpl_ROOT}/lib"
-      "$ENV{ARMPL_ROOT}/lib"
-      "$ENV{ARMPL_DIR}/lib"
-    PATHS
-      /opt/arm/armpl/lib
-  )
-
-  if(ARMPL_LIB)
-    set(_vpl_libs ${ARMPL_LIB})
-    if(VPL_THREADING)
-      list(APPEND _vpl_libs ${VPL_THREADING})
-    endif()
-    list(APPEND _vpl_libs pthread m dl)
-    set(VendorPerfLibs_LIBRARIES ${_vpl_libs} PARENT_SCOPE)
-    set(VendorPerfLibs_FOUND_LIBRARIES TRUE PARENT_SCOPE)
-    set(VPL_ID "ARMPL" CACHE STRING "Vendor Performance Library ID (unset, IntelMKL, NVPL, ARMPL, AOCL)" FORCE)
-  else()
-    set(VendorPerfLibs_FOUND_LIBRARIES FALSE PARENT_SCOPE)
-  endif()
-endfunction()
-
-function(find_VPL_AOCL)
-  if(NOT VPL_THREADING)
-    set(AOCL_BLAS_LIB_NAME "blis")
-    set(AOCL_FFTW_LIB_NAME "fftw3")
-  else()
-    set(AOCL_BLAS_LIB_NAME "blis-mt")
-    set(AOCL_FFTW_LIB_NAME "fftw3_omp")
-  endif()
-  set(AOCL_LAPACK_LIB_NAME "flame")
-
-  find_path(VendorPerfLibs_INCLUDE_DIR NAMES aocl.h blis.h
-    HINTS
-      "${AOCL_ROOT}/include"
-      "$ENV{AOCL_ROOT}/include"
-    PATHS
-      /opt/AMD/aocl/aocl-linux-gcc/include
-  )
-
-  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-    find_path(VendorPerfLibs_FFTW3_INCLUDE_DIR NAMES fftw3.f03 fftw3.h
-      HINTS
-        "${AOCL_ROOT}/include"
-        "$ENV{AOCL_ROOT}/include"
-      PATHS
-        /opt/AMD/aocl/aocl-linux-gcc/include
-      PATH_SUFFIXES fftw fftw3
-    )
-  endif()
-
-  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "blas" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-    find_library(AOCL_BLAS_LIB NAMES ${AOCL_BLAS_LIB_NAME}
-      HINTS
-        "${AOCL_ROOT}/lib"
-        "$ENV{AOCL_ROOT}/lib"
-      PATHS
-        /opt/AMD/aocl/aocl-linux-gcc/lib
-    )
-  endif()
-
-  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-    find_library(AOCL_LAPACK_LIB NAMES ${AOCL_LAPACK_LIB_NAME}
-      HINTS
-        "${AOCL_ROOT}/lib"
-        "$ENV{AOCL_ROOT}/lib"
-      PATHS
-        /opt/AMD/aocl/aocl-linux-gcc/lib
-    )
-  endif()
-
-  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-    find_library(AOCL_FFTW_LIB NAMES ${AOCL_FFTW_LIB_NAME}
-      HINTS
-        "${AOCL_ROOT}/lib"
-        "$ENV{AOCL_ROOT}/lib"
-      PATHS
-        /opt/AMD/aocl/aocl-linux-gcc/lib
-    )
-  endif()
-
-  set(_aocl_found TRUE)
-  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "blas" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-    if(NOT AOCL_BLAS_LIB)
-      set(_aocl_found FALSE)
-    endif()
-  endif()
-  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-    if(NOT AOCL_LAPACK_LIB)
-      set(_aocl_found FALSE)
-    endif()
-  endif()
-  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-    if(NOT AOCL_FFTW_LIB)
-      set(_aocl_found FALSE)
-    endif()
-  endif()
-
-  if(_aocl_found)
-    set(_vpl_libs)
-    if(NOT VendorPerfLibs_FIND_COMPONENTS OR "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-      list(APPEND _vpl_libs ${AOCL_LAPACK_LIB})
-    endif()
-    if(NOT VendorPerfLibs_FIND_COMPONENTS OR "blas" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-      list(APPEND _vpl_libs ${AOCL_BLAS_LIB})
-    endif()
-    if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-      list(APPEND _vpl_libs ${AOCL_FFTW_LIB})
-    endif()
-
-    if(VPL_THREADING)
-      list(APPEND _vpl_libs ${VPL_THREADING})
-    endif()
-
-    list(APPEND _vpl_libs pthread m dl)
-
-    set(VendorPerfLibs_LIBRARIES ${_vpl_libs} PARENT_SCOPE)
-    set(VendorPerfLibs_FOUND_LIBRARIES TRUE PARENT_SCOPE)
-    set(VPL_ID "AOCL" CACHE STRING "Vendor Performance Library ID (unset, IntelMKL, NVPL, ARMPL, AOCL)" FORCE)
-  else()
-    set(VendorPerfLibs_FOUND_LIBRARIES FALSE PARENT_SCOPE)
-  endif()
-endfunction()
 
 if(VendorPerfLibs_FIND_COMPONENTS AND "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS AND NOT "blas" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
   list(APPEND VendorPerfLibs_FIND_COMPONENTS "blas")
@@ -435,16 +163,6 @@ endif()
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
   if(NOT VPL_ID OR VPL_ID STREQUAL "IntelMKL")
     find_VPL_MKL()
-  endif()
-  if(NOT VPL_ID OR VPL_ID STREQUAL "AOCL")
-    find_VPL_AOCL()
-  endif()
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
-  if(NOT VPL_ID OR VPL_ID STREQUAL "NVPL")
-    find_VPL_NVPL()
-  endif()
-  if(NOT VPL_ID OR VPL_ID STREQUAL "ARMPL")
-    find_VPL_ARMPL()
   endif()
 endif()
 
