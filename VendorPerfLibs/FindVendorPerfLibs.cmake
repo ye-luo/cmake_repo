@@ -82,22 +82,33 @@ set(VPL_ID "${VPL_ID_GUESS}" CACHE STRING "Vendor Performance Library ID (IntelM
 
 set(_find_package_args)
 if(VendorPerfLibs_FIND_QUIETLY)
-  list(APPEND _find_package_args QUIET REQUIRED)
+  list(APPEND _find_package_args QUIET)
 endif()
 
+function(fix_MKL_ABI_layer CORE_LIB_VAR)
+  # GNU and LLVMFlang families of compilers follow modern C99 _Complex ABI convention.
+  # Intel, IntelLLVM, NVHPC follows the legacy convention.
+  if(CMAKE_Fortran_COMPILER_LOADED AND NOT (CMAKE_Fortran_COMPILER_ID MATCHES "^Intel" OR CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") AND NOT APPLE)
+    string(REPLACE "mkl_intel_lp64" "mkl_gf_lp64" ${CORE_LIB_VAR} "${${CORE_LIB_VAR}}")
+  endif()
+  set(${CORE_LIB_VAR} ${${CORE_LIB_VAR}} PARENT_SCOPE)
+  message(DEBUG "fixed path as ${CORE_LIB_VAR}=${${CORE_LIB_VAR}}")
+endfunction()
 
+macro(find_VPL_core)
+  set(VPL_CORE_FOUND TRUE)
+  if(VPL_ID STREQUAL "IntelMKL")
+    # MKL core library support BLAS/LAPACK and FFT.
+    # Thus we require VendorPerfLibs_INCLUDE_DIR and VPL_CORE_LIBRARIES being set
+    list(APPEND _vpl_required_vars VendorPerfLibs_INCLUDE_DIR VPL_CORE_LIBRARIES)
 
-macro(find_VPL_blas)
-  set(VPL_blas_ID ${VPL_ID} CACHE STRING "Vendor BLAS ID (IntelMKL, Generic)")
-  check_VPL_ID("VPL_blas_ID" "${VPL_blas_ID}")
-
-  if(VPL_blas_ID STREQUAL "IntelMKL")
     if(NOT VPL_OMP)
       set(BLA_VENDOR "Intel10_64lp_seq")
     else()
       set(BLA_VENDOR "Intel10_64lp")
     endif()
     find_package(BLAS ${_find_package_args})
+
     # Try to find MKL include directory
     find_path(VendorPerfLibs_INCLUDE_DIR NAMES mkl.h
       HINTS
@@ -106,19 +117,19 @@ macro(find_VPL_blas)
         "$ENV{MKL_ROOT}/include"
       PATH_SUFFIXES mkl
     )
-    # GNU and LLVMFlang families of compilers follow modern C99 _Complex ABI convention.
-    # Intel, IntelLLVM, NVHPC follows the legacy convention.
-    if(BLAS_FOUND AND CMAKE_Fortran_COMPILER_LOADED AND NOT (CMAKE_Fortran_COMPILER_ID MATCHES "^Intel" OR CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") AND NOT APPLE)
-      string(REPLACE "mkl_intel_lp64" "mkl_gf_lp64" BLAS_LIBRARIES "${BLAS_LIBRARIES}")
+
+    if(BLAS_FOUND AND VendorPerfLibs_INCLUDE_DIR)
+      fix_MKL_ABI_layer(BLAS_LIBRARIES)
+      set(VPL_CORE_LIBRARIES ${BLAS_LIBRARIES})
+    else()
+      set(VPL_CORE_FOUND FALSE)
     endif()
-  else()
-    find_package(BLAS ${_find_package_args})
   endif()
 
-  if(BLAS_FOUND)
-    list(APPEND _vpl_lib_found_ids "blas(${VPL_blas_ID})")
+  if(VPL_CORE_FOUND)
+    list(APPEND _vpl_lib_found_ids "core(${VPL_ID})")
   elseif(NOT VendorPerfLibs_FIND_QUIETLY)
-    message(WARNING "VPL_blas_ID '${VPL_blas_ID}' with OpenMP ${VPL_OMP}, not found")
+    message(WARNING "Incomplete core library setting VPL_ID '${VPL_ID}'.")
   endif()
 endmacro()
 
@@ -127,12 +138,18 @@ macro(find_VPL_lapack)
   check_VPL_ID("VPL_lapack_ID" "${VPL_lapack_ID}")
 
   if(VPL_lapack_ID STREQUAL "IntelMKL")
+    if(NOT VPL_ID STREQUAL "IntelMKL")
+      message(FATAL_ERROR "VendorPerfLibs: VPL_fft_ID is IntelMKL but VPL_ID is not IntelMKL. Unsupported.")
+    endif()
     if(NOT VPL_OMP)
       set(BLA_VENDOR "Intel10_64lp_seq")
     else()
       set(BLA_VENDOR "Intel10_64lp")
     endif()
     find_package(LAPACK ${_find_package_args})
+    if(LAPACK_FOUND)
+      fix_MKL_ABI_layer(LAPACK_LIBRARIES)
+    endif()
   else()
     find_package(LAPACK ${_find_package_args})
   endif()
@@ -140,7 +157,7 @@ macro(find_VPL_lapack)
   if(LAPACK_FOUND)
     list(APPEND _vpl_lib_found_ids "lapack(${VPL_lapack_ID})")
   elseif(NOT VendorPerfLibs_FIND_QUIETLY)
-    message(WARNING "VPL_lapack_ID '${VPL_lapack_ID}' with OpenMP ${VPL_OMP}, not found")
+    message(WARNING "LAPACK for VPL_lapack_ID '${VPL_lapack_ID}' with OpenMP ${VPL_OMP}, not found")
   endif()
 endmacro()
 
@@ -150,6 +167,9 @@ macro(find_VPL_fft)
 
   set(VPL_FFT_FOUND TRUE)
   if(VPL_fft_ID STREQUAL "IntelMKL")
+    if(NOT VPL_ID STREQUAL "IntelMKL")
+      message(FATAL_ERROR "VendorPerfLibs: VPL_fft_ID is IntelMKL but VPL_ID is not IntelMKL. Unsupported.")
+    endif()
     find_path(VendorPerfLibs_FFTW3_INCLUDE_DIR NAMES fftw3.f03
       HINTS
         "${MKL_ROOT}/include"
@@ -160,7 +180,7 @@ macro(find_VPL_fft)
         /opt/intel/mkl/include
       PATH_SUFFIXES fftw mkl/fftw
     )
-    set(FFT_LIBRARIES ${BLAS_LIBRARIES})
+    set(FFT_LIBRARIES ${VPL_CORE_LIBRARIES})
     if(NOT VendorPerfLibs_FFTW3_INCLUDE_DIR)
       set(VPL_FFT_FOUND FALSE)
     endif()
@@ -191,18 +211,13 @@ macro(find_VPL_fft)
   if(VPL_FFT_FOUND)
     list(APPEND _vpl_lib_found_ids "fft(${VPL_fft_ID})")
   elseif(NOT VendorPerfLibs_FIND_QUIETLY)
-    message(WARNING "VPL_fft_ID '${VPL_fft_ID}' with OpenMP ${VPL_OMP}, not found")
+    message(WARNING "FFT for VPL_fft_ID '${VPL_fft_ID}' with OpenMP ${VPL_OMP}, not found")
   endif()
 endmacro()
 
 set(_vpl_lib_found_ids)
 set(_vpl_required_vars _vpl_lib_found_ids)
-# blas is always searched regardless of request
-find_VPL_blas()
-list(APPEND _vpl_required_vars BLAS_LIBRARIES)
-if(NOT VPL_blas_ID STREQUAL "Generic")
-  list(APPEND _vpl_required_vars VendorPerfLibs_INCLUDE_DIR)
-endif()
+find_VPL_core()
 
 if(NOT VendorPerfLibs_FIND_COMPONENTS OR "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
   find_VPL_lapack()

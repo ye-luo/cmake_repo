@@ -9,20 +9,37 @@ if(USE_OMP)
   find_package(OpenMP REQUIRED COMPONENTS Fortran C)
 endif()
 
-# Find our custom VendorPerfLibs
 if(USE_OMP)
   set(VPL_OMP ON)
 endif()
-find_package(VendorPerfLibs REQUIRED fft)
 
 # Enable CTest
 enable_testing()
+
+# Test FFT
+
+# Find our custom VendorPerfLibs
+find_package(VendorPerfLibs REQUIRED fft)
+
+# Create the test executable
+add_executable(test_fftw3 tests/test_fftw3.c)
+
+# Link it against the BLAS target provided by VendorPerfLibs
+target_link_libraries(test_fftw3 PRIVATE VPL::fft)
+
+# Add the test
+add_test(NAME test_fftw3 COMMAND test_fftw3)
+
+# Test BLAS
+
+# Find our custom VendorPerfLibs
+find_package(VendorPerfLibs REQUIRED lapack)
 
 # Create the test executable
 add_executable(test_blas_zdotc tests/test_blas_zdotc.f90)
 
 # Link it against the BLAS target provided by VendorPerfLibs
-target_link_libraries(test_blas_zdotc PRIVATE VPL::blas)
+target_link_libraries(test_blas_zdotc PRIVATE VPL::lapack)
 
 # Add the test
 add_test(NAME test_blas_zdotc COMMAND test_blas_zdotc)
