@@ -28,15 +28,36 @@
 
 # FindVendorPerfLibs.cmake
 #
-# Searches for Intel MKL and creates the following CMake interface targets:
+# Searches for Vendor Performance Libraries (such as Intel MKL or generic
+# equivalents like Netlib LAPACK and FFTW3) and provides a unified interface.
+#
+# This module supports the following components:
+# - lapack : Linear Algebra PACKage
+# - fft    : Fast Fourier Transform
+#
+# Example usage:
+#   find_package(VendorPerfLibs COMPONENTS lapack fft REQUIRED)
+#
+# This module creates the following CMake imported targets (if their
+# respective components are found):
 # - VPL::lapack
 # - VPL::fft
 #
 # Input variables:
-# - VPL_ID: Specifies the vendor performance library to search for. Acceptable values are:
+# - VPL_ID: Specifies the vendor performance library family to search for.
+#   Acceptable values are:
 #     - "IntelMKL" : Intel Math Kernel Library
-#     - "Generic"  : Generic BLAS/LAPACK/FFT
-# - VPL_OMP: A boolean specifying the threading layer to use. If ON, OpenMP threading is used. If OFF (default), sequential is used.
+#     - "Generic"  : Generic libraries (e.g., standard BLAS/LAPACK and FFTW3)
+#   Note: If VPL_ID is not provided, the module will attempt to auto-detect
+#   the appropriate vendor by checking for the presence of the MKL core library.
+#
+# - VPL_OMP: A boolean specifying the threading layer to use.
+#   If ON, OpenMP threading is requested. If OFF (default), sequential is used.
+#   Note: If ON, you must call find_package(OpenMP) before finding VendorPerfLibs.
+#
+# Advanced Component-Specific Variables:
+# - VPL_lapack_ID: Overrides VPL_ID specifically for the LAPACK component.
+# - VPL_fft_ID: Overrides VPL_ID specifically for the FFT component.
 #
 
 include(FindPackageHandleStandardArgs)
@@ -140,7 +161,7 @@ macro(find_VPL_lapack)
 
   if(VPL_lapack_ID STREQUAL "IntelMKL")
     if(NOT VPL_ID STREQUAL "IntelMKL")
-      message(FATAL_ERROR "VendorPerfLibs: VPL_fft_ID is IntelMKL but VPL_ID is not IntelMKL. Unsupported.")
+      message(FATAL_ERROR "VendorPerfLibs: VPL_lapack_ID is IntelMKL but VPL_ID is not IntelMKL. Unsupported.")
     endif()
     if(NOT VPL_OMP)
       set(BLA_VENDOR "Intel10_64lp_seq")
@@ -235,15 +256,6 @@ find_package_handle_standard_args(VendorPerfLibs
 )
 
 if(VendorPerfLibs_FOUND)
-  # Create VPL::blas
-  if(NOT TARGET VPL::blas)
-    add_library(VPL::blas INTERFACE IMPORTED)
-    set_target_properties(VPL::blas PROPERTIES
-      INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR}"
-      INTERFACE_LINK_LIBRARIES "${BLAS_LIBRARIES}"
-    )
-  endif()
-
   # Create VPL::lapack
   if(NOT VendorPerfLibs_FIND_COMPONENTS OR "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
     if(NOT TARGET VPL::lapack)
