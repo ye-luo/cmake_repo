@@ -107,10 +107,19 @@ if(VendorPerfLibs_FIND_QUIETLY)
 endif()
 
 function(fix_MKL_ABI_layer CORE_LIB_VAR)
+  # https://gitlab.kitware.com/cmake/cmake/-/merge_requests/12479
+  # Switch to GNU Fortran ABI regarding how functions return complex numbers and how characters are passed (but not on Apple, where MKL does not provide it).
   # GNU and LLVMFlang families of compilers follow modern C99 _Complex ABI convention.
   # Intel, IntelLLVM, NVHPC follows the legacy convention.
   if(CMAKE_Fortran_COMPILER_LOADED AND NOT (CMAKE_Fortran_COMPILER_ID MATCHES "^Intel" OR CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") AND NOT APPLE)
     string(REPLACE "mkl_intel_lp64" "mkl_gf_lp64" ${CORE_LIB_VAR} "${${CORE_LIB_VAR}}")
+  endif()
+
+  # https://gitlab.kitware.com/cmake/cmake/-/merge_requests/12480
+  # Switch to GNU libgomp ABI regarding the OpenMP runtime.
+  # Most OpenMP runtime libraries claim to support drop-in replacement of libgomp.
+  if(OpenMP_FOUND AND NOT OpenMP_iomp5_LIBRARY)
+    string(REPLACE "mkl_intel_thread" "mkl_gnu_thread" ${CORE_LIB_VAR} "${${CORE_LIB_VAR}}")
   endif()
   set(${CORE_LIB_VAR} ${${CORE_LIB_VAR}} PARENT_SCOPE)
   message(DEBUG "fixed path as ${CORE_LIB_VAR}=${${CORE_LIB_VAR}}")
