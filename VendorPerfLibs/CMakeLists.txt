@@ -43,3 +43,5 @@ target_link_libraries(test_blas_zdotc PRIVATE VPL::lapack)
 
 # Add the test
 add_test(NAME test_blas_zdotc COMMAND test_blas_zdotc)
+
+find_package(VendorPerfLibs REQUIRED fft lapack)

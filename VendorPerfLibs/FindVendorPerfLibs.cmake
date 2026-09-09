@@ -157,8 +157,12 @@ macro(find_VPL_lapack)
 
   if(LAPACK_FOUND)
     list(APPEND _vpl_lib_found_ids "lapack(${VPL_lapack_ID})")
-  elseif(NOT VendorPerfLibs_FIND_QUIETLY)
-    message(WARNING "LAPACK for VPL_lapack_ID '${VPL_lapack_ID}' with OpenMP ${VPL_OMP}, not found")
+    set(VendorPerfLibs_lapack_FOUND TRUE)
+  else()
+    set(VendorPerfLibs_lapack_FOUND FALSE)
+    if(NOT VendorPerfLibs_FIND_QUIETLY)
+      message(WARNING "LAPACK for VPL_lapack_ID '${VPL_lapack_ID}' with OpenMP ${VPL_OMP}, not found")
+    endif()
   endif()
 endmacro()
 
@@ -204,8 +208,12 @@ macro(find_VPL_fft)
 
   if(VPL_FFT_FOUND)
     list(APPEND _vpl_lib_found_ids "fft(${VPL_fft_ID})")
-  elseif(NOT VendorPerfLibs_FIND_QUIETLY)
-    message(WARNING "FFT for VPL_fft_ID '${VPL_fft_ID}' with OpenMP ${VPL_OMP}, not found")
+    set(VendorPerfLibs_fft_FOUND TRUE)
+  else()
+    set(VendorPerfLibs_fft_FOUND FALSE)
+    if(NOT VendorPerfLibs_FIND_QUIETLY)
+      message(WARNING "FFT for VPL_fft_ID '${VPL_fft_ID}' with OpenMP ${VPL_OMP}, not found")
+    endif()
   endif()
 endmacro()
 
@@ -223,6 +231,7 @@ endif()
 
 find_package_handle_standard_args(VendorPerfLibs
   REQUIRED_VARS ${_vpl_required_vars}
+  HANDLE_COMPONENTS
 )
 
 if(VendorPerfLibs_FOUND)
