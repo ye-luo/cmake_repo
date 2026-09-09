@@ -66,9 +66,20 @@ if(NOT (CMAKE_C_COMPILER_LOADED OR CMAKE_CXX_COMPILER_LOADED))
   message(FATAL_ERROR "VendorPerfLibs: C or CXX compiler must be loaded before calling find_package(VendorPerfLibs)")
 endif()
 
+set(VPL_REQUIRED_LINK_OPTIONS_SAVED ${CMAKE_REQUIRED_LINK_OPTIONS})
+
 option(VPL_OMP "Use OpenMP threading for Vendor Performance Libraries" OFF)
-if(VPL_OMP AND NOT OpenMP_FOUND)
-  message(FATAL_ERROR "VendorPerfLibs: VPL_OMP is ON but OpenMP_FOUND is false. Please find_package(OpenMP) before finding VendorPerfLibs.")
+if(VPL_OMP)
+  if(NOT OpenMP_FOUND)
+    message(FATAL_ERROR "VendorPerfLibs: VPL_OMP is ON but OpenMP_FOUND is false. Please invoke find_package(OpenMP) before VendorPerfLibs.")
+  endif()
+  if(CMAKE_Fortran_COMPILER_LOADED AND OpenMP_Fortran_FOUND)
+    set(CMAKE_REQUIRED_LINK_OPTIONS ${OpenMP_Fortran_FLAGS})
+  elseif(CMAKE_C_COMPILER_LOADED AND OpenMP_C_FOUND)
+    set(CMAKE_REQUIRED_LINK_OPTIONS ${OpenMP_C_FLAGS})
+  elseif(CMAKE_CXX_COMPILER_LOADED AND OpenMP_CXX_FOUND)
+    set(CMAKE_REQUIRED_LINK_OPTIONS ${OpenMP_CXX_FLAGS})
+  endif()
 endif()
 
 set(_VPL_VALID_IDS "IntelMKL" "Generic")
@@ -106,23 +117,24 @@ if(VendorPerfLibs_FIND_QUIETLY)
   list(APPEND _find_package_args QUIET)
 endif()
 
-function(fix_MKL_ABI_layer CORE_LIB_VAR)
+function(warn_MKL_Fortran_ABI_issue CORE_LIB_VAR)
   # https://gitlab.kitware.com/cmake/cmake/-/merge_requests/12479
   # Switch to GNU Fortran ABI regarding how functions return complex numbers and how characters are passed (but not on Apple, where MKL does not provide it).
   # GNU and LLVMFlang families of compilers follow modern C99 _Complex ABI convention.
   # Intel, IntelLLVM, NVHPC follows the legacy convention.
-  if(CMAKE_Fortran_COMPILER_LOADED AND NOT (CMAKE_Fortran_COMPILER_ID MATCHES "^Intel" OR CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") AND NOT APPLE)
-    string(REPLACE "mkl_intel_lp64" "mkl_gf_lp64" ${CORE_LIB_VAR} "${${CORE_LIB_VAR}}")
+  if(CMAKE_Fortran_COMPILER_LOADED AND CMAKE_VERSION VERSION_LESS "4.5")
+    if(NOT (CMAKE_Fortran_COMPILER_ID MATCHES "^Intel" OR CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") AND NOT APPLE)
+      string(REPLACE "mkl_intel_lp64" "mkl_gf_lp64" CORE_LIBS "${${CORE_LIB_VAR}}")
+    else()
+      set(CORE_LIBS "${${CORE_LIB_VAR}}")
+    endif()
+    if(NOT VendorPerfLibs_FIND_QUIETLY AND NOT CORE_LIBS STREQUAL "${${CORE_LIB_VAR}}")
+      message(WARNING "Potential incorrect selection of MKL ABI layer in variable ${CORE_LIB_VAR}.\n"
+                      "    Original  : ${${CORE_LIB_VAR}}.\n"
+                      "    Preferred : ${CORE_LIBS}\n"
+                      "Use CMake >=4.5")
+    endif()
   endif()
-
-  # https://gitlab.kitware.com/cmake/cmake/-/merge_requests/12480
-  # Switch to GNU libgomp ABI regarding the OpenMP runtime.
-  # Most OpenMP runtime libraries claim to support drop-in replacement of libgomp.
-  if(OpenMP_FOUND AND NOT OpenMP_iomp5_LIBRARY)
-    string(REPLACE "mkl_intel_thread" "mkl_gnu_thread" ${CORE_LIB_VAR} "${${CORE_LIB_VAR}}")
-  endif()
-  set(${CORE_LIB_VAR} ${${CORE_LIB_VAR}} PARENT_SCOPE)
-  message(DEBUG "fixed path as ${CORE_LIB_VAR}=${${CORE_LIB_VAR}}")
 endfunction()
 
 macro(find_VPL_core)
@@ -149,7 +161,7 @@ macro(find_VPL_core)
     )
 
     if(BLAS_FOUND AND VendorPerfLibs_INCLUDE_DIR)
-      fix_MKL_ABI_layer(BLAS_LIBRARIES)
+      warn_MKL_Fortran_ABI_issue(BLAS_LIBRARIES)
       set(VPL_CORE_LIBRARIES ${BLAS_LIBRARIES})
     else()
       set(VPL_CORE_FOUND FALSE)
@@ -180,7 +192,7 @@ macro(find_VPL_lapack)
     endif()
     find_package(LAPACK ${_find_package_args})
     if(LAPACK_FOUND)
-      fix_MKL_ABI_layer(LAPACK_LIBRARIES)
+      warn_MKL_Fortran_ABI_issue(LAPACK_LIBRARIES)
     endif()
   else()
     find_package(LAPACK ${_find_package_args})
@@ -288,3 +300,5 @@ if(VendorPerfLibs_FOUND)
     endif()
   endif()
 endif()
+
+set(CMAKE_REQUIRED_LINK_OPTIONS ${VPL_REQUIRED_LINK_OPTIONS_SAVED})
