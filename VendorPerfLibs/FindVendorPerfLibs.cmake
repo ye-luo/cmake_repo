@@ -62,12 +62,13 @@
 #
 
 include(FindPackageHandleStandardArgs)
+include(CMakePushCheckState)
 
 if(NOT (CMAKE_C_COMPILER_LOADED OR CMAKE_CXX_COMPILER_LOADED))
   message(FATAL_ERROR "VendorPerfLibs: C or CXX compiler must be loaded before calling find_package(VendorPerfLibs)")
 endif()
 
-set(VPL_REQUIRED_LINK_OPTIONS_SAVED ${CMAKE_REQUIRED_LINK_OPTIONS})
+cmake_push_check_state()
 
 if(VPL_OMP)
   if(NOT OpenMP_FOUND)
@@ -281,27 +282,35 @@ find_package_handle_standard_args(VendorPerfLibs
 )
 
 if(VendorPerfLibs_FOUND)
-  # Create VPL::lapack
+  # Create vpl_lapack
   if(NOT VendorPerfLibs_FIND_COMPONENTS OR "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-    if(NOT TARGET VPL::lapack)
-      add_library(VPL::lapack INTERFACE IMPORTED)
-      set_target_properties(VPL::lapack PROPERTIES
+    if(NOT TARGET vpl_lapack)
+      add_library(vpl_lapack INTERFACE IMPORTED)
+      set_target_properties(vpl_lapack PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR}"
         INTERFACE_LINK_LIBRARIES "${LAPACK_LIBRARIES}"
       )
+      add_library(VPL::lapack ALIAS vpl_lapack)
     endif()
   endif()
 
-  # Create VPL::fft
+  # Create vpl_fft
   if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-    if(NOT TARGET VPL::fft)
-      add_library(VPL::fft INTERFACE IMPORTED)
-      set_target_properties(VPL::fft PROPERTIES
+    if(NOT TARGET vpl_fft)
+      add_library(vpl_fft INTERFACE IMPORTED)
+      set_target_properties(vpl_fft PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR};${VendorPerfLibs_FFTW3_INCLUDE_DIR}"
         INTERFACE_LINK_LIBRARIES "${VPL_FFT_LIBRARIES}"
       )
+      add_library(VPL::fft ALIAS vpl_fft)
     endif()
   endif()
 endif()
 
-set(CMAKE_REQUIRED_LINK_OPTIONS ${VPL_REQUIRED_LINK_OPTIONS_SAVED})
+cmake_pop_check_state()
+
+# Scope cleanup
+unset(_find_package_args)
+unset(_vpl_required_vars)
+unset(_vpl_lib_found_ids)
+unset(_VPL_VALID_IDS)

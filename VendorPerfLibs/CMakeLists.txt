@@ -5,9 +5,7 @@ project(VendorPerfLibsTest LANGUAGES Fortran C)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
 
 option(USE_OMP "Use OpenMP threading" OFF)
-if(USE_OMP)
-  find_package(OpenMP REQUIRED COMPONENTS Fortran C)
-endif()
+find_package(OpenMP REQUIRED COMPONENTS Fortran C)
 
 option(VPL_OMP "Use OpenMP threading for Vendor Performance Libraries" ${USE_OMP})
 
@@ -28,7 +26,6 @@ target_link_libraries(test_blas_zdotc PRIVATE VPL::lapack)
 # Add the test
 add_test(NAME test_blas_zdotc COMMAND test_blas_zdotc)
 
-set(VPL_OMP OFF)
 find_package(VendorPerfLibs REQUIRED fft lapack)# Test FFT
 
 # Find our custom VendorPerfLibs
