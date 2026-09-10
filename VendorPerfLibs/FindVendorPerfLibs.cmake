@@ -34,14 +34,16 @@
 # This module supports the following components:
 # - lapack : Linear Algebra PACKage
 # - fft    : Fast Fourier Transform
+# - vml    : Vector Math Library (Intel MKL specific)
 #
 # Example usage:
-#   find_package(VendorPerfLibs COMPONENTS lapack fft REQUIRED)
+#   find_package(VendorPerfLibs COMPONENTS lapack fft vml REQUIRED)
 #
 # This module creates the following CMake imported targets (if their
 # respective components are found):
 # - VPL::lapack
 # - VPL::fft
+# - VPL::vml
 #
 # Input variables:
 # - VPL_ID: Specifies the vendor performance library family to search for.
@@ -59,6 +61,7 @@
 # Advanced Component-Specific Variables:
 # - VPL_lapack_ID: Overrides VPL_ID specifically for the LAPACK component.
 # - VPL_fft_ID: Overrides VPL_ID specifically for the FFT component.
+# - VPL_vml_ID: Overrides VPL_ID specifically for the VML component.
 #
 
 include(FindPackageHandleStandardArgs)
@@ -264,6 +267,33 @@ macro(find_VPL_fft)
   endif()
 endmacro()
 
+macro(find_VPL_vml)
+  set(VPL_vml_ID ${VPL_ID} CACHE STRING "Vendor VML ID (IntelMKL, Generic)")
+  check_VPL_ID("VPL_vml_ID" "${VPL_vml_ID}")
+
+  set(VPL_VML_FOUND TRUE)
+  if(VPL_vml_ID STREQUAL "IntelMKL")
+    if(NOT VPL_ID STREQUAL "IntelMKL")
+      message(FATAL_ERROR "VendorPerfLibs: VPL_vml_ID is IntelMKL but VPL_ID is not IntelMKL. Unsupported.")
+    endif()
+    # VML is part of MKL core. No additional libraries needed beyond core MKL libraries.
+    set(VPL_VML_LIBRARIES ${VPL_CORE_LIBRARIES})
+  else()
+    # Generic VML is not currently supported (e.g. no direct open source drop-in)
+    set(VPL_VML_FOUND FALSE)
+  endif()
+
+  if(VPL_VML_FOUND)
+    list(APPEND _vpl_lib_found_ids "vml(${VPL_vml_ID})")
+    set(VendorPerfLibs_vml_FOUND TRUE)
+  else()
+    set(VendorPerfLibs_vml_FOUND FALSE)
+    if(NOT VendorPerfLibs_FIND_QUIETLY)
+      message(WARNING "VML for VPL_vml_ID '${VPL_vml_ID}' not found or unsupported")
+    endif()
+  endif()
+endmacro()
+
 set(_vpl_lib_found_ids)
 set(_vpl_required_vars _vpl_lib_found_ids)
 find_VPL_core()
@@ -274,6 +304,10 @@ endif()
 
 if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
   find_VPL_fft()
+endif()
+
+if(NOT VendorPerfLibs_FIND_COMPONENTS OR "vml" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+  find_VPL_vml()
 endif()
 
 find_package_handle_standard_args(VendorPerfLibs
@@ -303,6 +337,18 @@ if(VendorPerfLibs_FOUND)
         INTERFACE_LINK_LIBRARIES "${VPL_FFT_LIBRARIES}"
       )
       add_library(VPL::fft ALIAS vpl_fft)
+    endif()
+  endif()
+
+  # Create vpl_vml
+  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "vml" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+    if(NOT TARGET vpl_vml)
+      add_library(vpl_vml INTERFACE IMPORTED)
+      set_target_properties(vpl_vml PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR}"
+        INTERFACE_LINK_LIBRARIES "${VPL_VML_LIBRARIES}"
+      )
+      add_library(VPL::vml ALIAS vpl_vml)
     endif()
   endif()
 endif()
