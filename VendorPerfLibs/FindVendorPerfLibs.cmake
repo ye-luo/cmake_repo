@@ -51,9 +51,10 @@
 #   Note: If VPL_ID is not provided, the module will attempt to auto-detect
 #   the appropriate vendor by checking for the presence of the MKL core library.
 #
-# - VPL_OMP: A boolean specifying the threading layer to use.
-#   If ON, OpenMP threading is requested. If OFF (default), sequential is used.
+# - VPL_OMP: If ON, OpenMP threading is requested. If OFF (default), sequential is used.
 #   Note: If ON, you must call find_package(OpenMP) before finding VendorPerfLibs.
+#   It is recommended to set the following in the project top-level for consistent selection of threading.
+#   option(VPL_OMP "Use OpenMP threading for Vendor Performance Libraries" ${<project_OpenMP_variable>})
 #
 # Advanced Component-Specific Variables:
 # - VPL_lapack_ID: Overrides VPL_ID specifically for the LAPACK component.
@@ -68,7 +69,6 @@ endif()
 
 set(VPL_REQUIRED_LINK_OPTIONS_SAVED ${CMAKE_REQUIRED_LINK_OPTIONS})
 
-option(VPL_OMP "Use OpenMP threading for Vendor Performance Libraries" OFF)
 if(VPL_OMP)
   if(NOT OpenMP_FOUND)
     message(FATAL_ERROR "VendorPerfLibs: VPL_OMP is ON but OpenMP_FOUND is false. Please invoke find_package(OpenMP) before VendorPerfLibs.")
@@ -237,6 +237,9 @@ macro(find_VPL_fft)
     # search for fftw3
     if(VPL_OMP)
       find_package(FFTW3 ${_find_package_args} COMPONENTS seq omp)
+      if(NOT FFTW3_FOUND)
+        find_package(FFTW3 ${_find_package_args} COMPONENTS seq)
+      endif()
     else()
       find_package(FFTW3 ${_find_package_args} COMPONENTS seq)
     endif()

@@ -9,9 +9,7 @@ if(USE_OMP)
   find_package(OpenMP REQUIRED COMPONENTS Fortran C)
 endif()
 
-if(USE_OMP)
-  set(VPL_OMP ON)
-endif()
+option(VPL_OMP "Use OpenMP threading for Vendor Performance Libraries" ${USE_OMP})
 
 # Enable CTest
 enable_testing()
