@@ -28,13 +28,13 @@
 
 # FindVendorPerfLibs.cmake
 #
-# Searches for Vendor Performance Libraries (such as Intel MKL or generic
+# Searches for Vendor Performance Libraries (such as Intel MKL, AMD AOCL, or generic
 # equivalents like Netlib LAPACK and FFTW3) and provides a unified interface.
 #
 # This module supports the following components:
 # - lapack : Linear Algebra PACKage
 # - fft    : Fast Fourier Transform
-# - vml    : Vector Math Library (Intel MKL specific)
+# - vml    : Vector Math Library
 #
 # Example usage:
 #   find_package(VendorPerfLibs COMPONENTS lapack fft vml REQUIRED)
@@ -49,9 +49,10 @@
 # - VPL_ID: Specifies the vendor performance library family to search for.
 #   Acceptable values are:
 #     - "IntelMKL" : Intel Math Kernel Library
+#     - "AOCL"     : AMD Optimizing CPU Libraries
 #     - "Generic"  : Generic libraries (e.g., standard BLAS/LAPACK and FFTW3)
 #   Note: If VPL_ID is not provided, the module will attempt to auto-detect
-#   the appropriate vendor by checking for the presence of the MKL core library.
+#   the appropriate vendor by checking for the presence of the MKL core or AOCL BLIS libraries.
 #
 # - VPL_OMP: If ON, OpenMP threading is requested. If OFF (default), sequential is used.
 #   Note: If ON, you must call find_package(OpenMP) before finding VendorPerfLibs.
