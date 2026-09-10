@@ -86,7 +86,7 @@ if(VPL_OMP)
   endif()
 endif()
 
-set(_VPL_VALID_IDS "IntelMKL" "Generic")
+set(_VPL_VALID_IDS "IntelMKL" "AOCL" "Generic")
 function(check_VPL_ID var_name id_to_check)
   if(NOT id_to_check IN_LIST _VPL_VALID_IDS)
     message(FATAL_ERROR "VendorPerfLibs: Unknown ${var_name} '${id_to_check}'. Acceptable values are: 'IntelMKL', 'Generic'")
@@ -101,8 +101,17 @@ macro(speculateVendor)
       "$ENV{MKL_ROOT}/lib/intel64"
   )
 
+  find_library(_AOCL_TEST_LIB NAMES blis blis-mt
+    HINTS
+      "${AOCL_ROOT}/lib"
+      "$ENV{AOCLROOT}/lib"
+      "$ENV{AOCL_ROOT}/lib"
+  )
+
   if(_MKL_CORE_TEST_LIB)
     set(VPL_ID_GUESS "IntelMKL")
+  elseif(_AOCL_TEST_LIB)
+    set(VPL_ID_GUESS "AOCL")
   else()
     set(VPL_ID_GUESS "Generic")
   endif()
@@ -173,6 +182,22 @@ macro(find_VPL_core)
         message(WARNING "Intel MKL not found. Please set the MKL root directory via CMake variables CMAKE_PREFIX_PATH or MKL_ROOT, or environment variables MKL_ROOT or MKLROOT.")
       endif()
     endif()
+  elseif(VPL_ID STREQUAL "AOCL")
+    list(APPEND _vpl_required_vars VendorPerfLibs_INCLUDE_DIR)
+
+    find_path(VendorPerfLibs_INCLUDE_DIR NAMES blis/blis.h blis.h
+      HINTS
+        "${AOCL_ROOT}/include"
+        "$ENV{AOCLROOT}/include"
+        "$ENV{AOCL_ROOT}/include"
+    )
+
+    if(NOT VendorPerfLibs_INCLUDE_DIR)
+      set(VPL_CORE_FOUND FALSE)
+      if(NOT VendorPerfLibs_FIND_QUIETLY)
+        message(WARNING "AMD AOCL include directory not found. Please set the AOCL root directory via CMake variables CMAKE_PREFIX_PATH or AOCL_ROOT, or environment variables AOCL_ROOT or AOCLROOT.")
+      endif()
+    endif()
   endif()
 
   if(VPL_CORE_FOUND)
@@ -198,6 +223,16 @@ macro(find_VPL_lapack)
     if(LAPACK_FOUND)
       warn_MKL_Fortran_ABI_issue(LAPACK_LIBRARIES)
     endif()
+  elseif(VPL_lapack_ID STREQUAL "AOCL")
+    if(NOT VPL_ID STREQUAL "AOCL")
+      message(FATAL_ERROR "VendorPerfLibs: VPL_lapack_ID is AOCL but VPL_ID is not AOCL. Unsupported.")
+    endif()
+    if(NOT VPL_OMP)
+      set(BLA_VENDOR "AOCL")
+    else()
+      set(BLA_VENDOR "AOCL_mt")
+    endif()
+    find_package(LAPACK ${_find_package_args})
   else()
     find_package(LAPACK ${_find_package_args})
   endif()
@@ -278,6 +313,19 @@ macro(find_VPL_vml)
     endif()
     # VML is part of MKL core. No additional libraries needed beyond core MKL libraries.
     set(VPL_VML_LIBRARIES ${VPL_CORE_LIBRARIES})
+  elseif(VPL_vml_ID STREQUAL "AOCL")
+    if(NOT VPL_ID STREQUAL "AOCL")
+      message(FATAL_ERROR "VendorPerfLibs: VPL_vml_ID is AOCL but VPL_ID is not AOCL. Unsupported.")
+    endif()
+    find_library(VPL_VML_LIBRARIES NAMES alm
+      HINTS
+        "${AOCL_ROOT}/lib"
+        "$ENV{AOCLROOT}/lib"
+        "$ENV{AOCL_ROOT}/lib"
+    )
+    if(NOT VPL_VML_LIBRARIES)
+      set(VPL_VML_FOUND FALSE)
+    endif()
   else()
     # Generic VML is not currently supported (e.g. no direct open source drop-in)
     set(VPL_VML_FOUND FALSE)
