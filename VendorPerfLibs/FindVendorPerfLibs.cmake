@@ -97,17 +97,10 @@ endfunction()
 macro(speculateVendor)
   find_library(_MKL_CORE_TEST_LIB NAMES mkl_core
     HINTS
-      "${MKL_ROOT}/lib/intel64"
       "$ENV{MKLROOT}/lib/intel64"
-      "$ENV{MKL_ROOT}/lib/intel64"
   )
 
-  find_library(_AOCL_TEST_LIB NAMES blis blis-mt
-    HINTS
-      "${AOCL_ROOT}/lib"
-      "$ENV{AOCLROOT}/lib"
-      "$ENV{AOCL_ROOT}/lib"
-  )
+  find_library(_AOCL_TEST_LIB NAMES blis blis-mt)
 
   if(_MKL_CORE_TEST_LIB)
     set(VPL_ID_GUESS "IntelMKL")
@@ -169,9 +162,7 @@ macro(find_VPL_core)
     # Try to find MKL include directory
     find_path(VendorPerfLibs_INCLUDE_DIR NAMES mkl.h
       HINTS
-        "${MKL_ROOT}/include"
         "$ENV{MKLROOT}/include"
-        "$ENV{MKL_ROOT}/include"
       PATH_SUFFIXES mkl
     )
 
@@ -181,32 +172,22 @@ macro(find_VPL_core)
     else()
       set(VPL_CORE_FOUND FALSE)
       if(NOT VendorPerfLibs_FIND_QUIETLY)
-        message(WARNING "Intel MKL not found. Please set the MKL root directory via CMake variables CMAKE_PREFIX_PATH or MKL_ROOT, or environment variables MKL_ROOT or MKLROOT.")
+        message(WARNING "Intel MKL not found. Please set the MKL root directory via CMake variable CMAKE_PREFIX_PATH or environment variable MKLROOT.")
       endif()
     endif()
   elseif(VPL_ID STREQUAL "AOCL")
     list(APPEND _vpl_required_vars VendorPerfLibs_INCLUDE_DIR)
 
-    find_path(VendorPerfLibs_INCLUDE_DIR NAMES blis/blis.h blis.h
-      HINTS
-        "${AOCL_ROOT}/include"
-        "$ENV{AOCLROOT}/include"
-        "$ENV{AOCL_ROOT}/include"
-    )
+    find_path(VendorPerfLibs_INCLUDE_DIR NAMES blis/blis.h blis.h)
 
     if(NOT VendorPerfLibs_INCLUDE_DIR)
       set(VPL_CORE_FOUND FALSE)
       if(NOT VendorPerfLibs_FIND_QUIETLY)
-        message(WARNING "AMD AOCL include directory not found. Please set the AOCL root directory via CMake variables CMAKE_PREFIX_PATH or AOCL_ROOT, or environment variables AOCL_ROOT or AOCLROOT.")
+        message(WARNING "AMD AOCL include directory not found. Please set the AOCL root directory via CMake variable CMAKE_PREFIX_PATH.")
       endif()
     endif()
 
-    find_library(AOCL_UTILS_LIB NAMES aoclutils
-      HINTS
-        "${AOCL_ROOT}/lib"
-        "$ENV{AOCLROOT}/lib"
-        "$ENV{AOCL_ROOT}/lib"
-    )
+    find_library(AOCL_UTILS_LIB NAMES aoclutils)
     if(AOCL_UTILS_LIB)
       set(VPL_UTILS ${AOCL_UTILS_LIB})
     endif()
@@ -276,9 +257,7 @@ macro(find_VPL_fft)
     endif()
     find_path(VendorPerfLibs_FFTW3_INCLUDE_DIR NAMES fftw3.f03
       HINTS
-        "${MKL_ROOT}/include"
         "$ENV{MKLROOT}/include"
-        "$ENV{MKL_ROOT}/include"
       PATHS
         /opt/intel/oneapi/mkl/latest/include
         /opt/intel/mkl/include
@@ -333,12 +312,7 @@ macro(find_VPL_vml)
     if(NOT VPL_ID STREQUAL "AOCL")
       message(FATAL_ERROR "VendorPerfLibs: VPL_vml_ID is AOCL but VPL_ID is not AOCL. Unsupported.")
     endif()
-    find_library(VPL_VML_LIBRARIES NAMES alm
-      HINTS
-        "${AOCL_ROOT}/lib"
-        "$ENV{AOCLROOT}/lib"
-        "$ENV{AOCL_ROOT}/lib"
-    )
+    find_library(VPL_VML_LIBRARIES NAMES alm)
     if(NOT VPL_VML_LIBRARIES)
       set(VPL_VML_FOUND FALSE)
     endif()
