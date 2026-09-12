@@ -52,7 +52,7 @@
 #     - "AOCL"     : AMD Optimizing CPU Libraries
 #     - "Generic"  : Generic libraries (e.g., standard BLAS/LAPACK and FFTW3)
 #   Note: If VPL_ID is not provided, the module will attempt to auto-detect
-#   the appropriate vendor by checking for the presence of the MKL core or AOCL BLIS libraries.
+#   the appropriate vendor by checking for the presence of the MKL core or AOCL utils libraries.
 #
 # - VPL_OMP: If ON, OpenMP threading is requested. If OFF (default), sequential is used.
 #   Note: If ON, you must call find_package(OpenMP) before finding VendorPerfLibs.
@@ -100,11 +100,11 @@ macro(speculateVendor)
       "$ENV{MKLROOT}/lib/intel64"
   )
 
-  find_library(_AOCL_TEST_LIB NAMES blis blis-mt)
+  find_library(AOCL_UTILS_LIB NAMES aoclutils)
 
   if(_MKL_CORE_TEST_LIB)
     set(VPL_ID_GUESS "IntelMKL")
-  elseif(_AOCL_TEST_LIB)
+  elseif(AOCL_UTILS_LIB)
     set(VPL_ID_GUESS "AOCL")
   else()
     set(VPL_ID_GUESS "Generic")
