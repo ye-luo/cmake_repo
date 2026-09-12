@@ -32,12 +32,12 @@ find_package(VendorPerfLibs REQUIRED fft lapack)# Test FFT
 find_package(VendorPerfLibs REQUIRED fft)
 
 # Create the test executable
-add_executable(test_fftw3 tests/test_fftw3.c)
+add_executable(test_fftw tests/test_fftw.c)
 
 # Link it against the BLAS target provided by VendorPerfLibs
-target_link_libraries(test_fftw3 PRIVATE VPL::fft)
+target_link_libraries(test_fftw PRIVATE VPL::fft)
 
 # Add the test
-add_test(NAME test_fftw3 COMMAND test_fftw3)
+add_test(NAME test_fftw COMMAND test_fftw)
 
 

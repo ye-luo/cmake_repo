@@ -28,6 +28,6 @@ int main(void) {
     fftw_free(in);
     fftw_free(out);
 
-    printf("FFTW3 test completed successfully.\n");
+    printf("FFTW test completed successfully.\n");
     return 0;
 }

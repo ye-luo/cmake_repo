@@ -29,7 +29,7 @@
 # FindVendorPerfLibs.cmake
 #
 # Searches for Vendor Performance Libraries (such as Intel MKL, AMD AOCL, or generic
-# equivalents like Netlib LAPACK and FFTW3) and provides a unified interface.
+# equivalents like Netlib LAPACK and FFTW) and provides a unified interface.
 #
 # This module supports the following components:
 # - lapack : Linear Algebra PACKage
@@ -50,7 +50,7 @@
 #   Acceptable values are:
 #     - "IntelMKL" : Intel Math Kernel Library
 #     - "AOCL"     : AMD Optimizing CPU Libraries
-#     - "Generic"  : Generic libraries (e.g., standard BLAS/LAPACK and FFTW3)
+#     - "Generic"  : Generic libraries (e.g., standard BLAS/LAPACK and FFTW)
 #   Note: If VPL_ID is not provided, the module will attempt to auto-detect
 #   the appropriate vendor by checking for the presence of the MKL core or AOCL utils libraries.
 #
@@ -248,14 +248,14 @@ endmacro()
 macro(find_VPL_fft)
   set(VPL_fft_ID ${VPL_ID} CACHE STRING "Vendor FFT ID (IntelMKL, Generic)")
   check_VPL_ID("VPL_fft_ID" "${VPL_fft_ID}")
-  list(APPEND _vpl_required_vars VendorPerfLibs_FFTW3_INCLUDE_DIR VPL_FFT_LIBRARIES)
+  list(APPEND _vpl_required_vars VendorPerfLibs_FFTW_INCLUDE_DIR VPL_FFT_LIBRARIES)
 
   set(VPL_FFT_FOUND TRUE)
   if(VPL_fft_ID STREQUAL "IntelMKL")
     if(NOT VPL_ID STREQUAL "IntelMKL")
       message(FATAL_ERROR "VendorPerfLibs: VPL_fft_ID is IntelMKL but VPL_ID is not IntelMKL. Unsupported.")
     endif()
-    find_path(VendorPerfLibs_FFTW3_INCLUDE_DIR NAMES fftw3.f03
+    find_path(VendorPerfLibs_FFTW_INCLUDE_DIR NAMES fftw3.f03
       HINTS
         "$ENV{MKLROOT}/include"
       PATHS
@@ -264,23 +264,23 @@ macro(find_VPL_fft)
       PATH_SUFFIXES fftw mkl/fftw
     )
     set(VPL_FFT_LIBRARIES ${VPL_CORE_LIBRARIES})
-    if(NOT VendorPerfLibs_FFTW3_INCLUDE_DIR)
+    if(NOT VendorPerfLibs_FFTW_INCLUDE_DIR)
       set(VPL_FFT_FOUND FALSE)
     endif()
   else()
-    # search for fftw3
+    # search for fftw
     if(VPL_OMP)
-      find_package(FFTW3 ${_find_package_args} COMPONENTS seq omp)
-      if(NOT FFTW3_FOUND)
-        find_package(FFTW3 ${_find_package_args} COMPONENTS seq)
+      find_package(FFTW ${_find_package_args} COMPONENTS seq omp)
+      if(NOT FFTW_FOUND)
+        find_package(FFTW ${_find_package_args} COMPONENTS seq)
       endif()
     else()
-      find_package(FFTW3 ${_find_package_args} COMPONENTS seq)
+      find_package(FFTW ${_find_package_args} COMPONENTS seq)
     endif()
-    if(FFTW3_FOUND)
+    if(FFTW_FOUND)
       set(VPL_FFT_FOUND TRUE)
-      set(VendorPerfLibs_FFTW3_INCLUDE_DIR ${FFTW3_INCLUDE_DIR})
-      set(VPL_FFT_LIBRARIES ${FFTW3_LIBRARIES})
+      set(VendorPerfLibs_FFTW_INCLUDE_DIR ${FFTW_INCLUDE_DIR})
+      set(VPL_FFT_LIBRARIES ${FFTW_LIBRARIES})
     else()
       set(VPL_FFT_FOUND FALSE)
     endif()
@@ -371,7 +371,7 @@ if(VendorPerfLibs_FOUND)
     if(NOT TARGET vpl_fft)
       add_library(vpl_fft INTERFACE IMPORTED)
       set_target_properties(vpl_fft PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR};${VendorPerfLibs_FFTW3_INCLUDE_DIR}"
+        INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR};${VendorPerfLibs_FFTW_INCLUDE_DIR}"
         INTERFACE_LINK_LIBRARIES "${VPL_FFT_LIBRARIES};${VPL_UTILS}"
       )
       add_library(VPL::fft ALIAS vpl_fft)
