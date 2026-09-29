@@ -50,13 +50,15 @@
 #   Acceptable values are:
 #     - "IntelMKL" : Intel Math Kernel Library
 #     - "AOCL"     : AMD Optimizing CPU Libraries
+#     - "NVPL"     : NVIDIA Performance Libraries
 #     - "Generic"  : Generic libraries (e.g., standard BLAS/LAPACK and FFTW)
 #   Note: If VPL_ID is not set, the following rules determine its value
 #   (once a rule applies, the subsequent rules are ignored):
 #     1. "Generic" if BLA_VENDOR was specified.
 #     2. "IntelMKL" if the Intel MKL mkl_core library file was found.
 #     3. "AOCL" if the AOCL aoclutils library file was found.
-#     4. "Generic" if all previous rules fail.
+#     4. "NVPL" if the nvpl CMake package was found.
+#     5. "Generic" if all previous rules fail.
 #
 # - VPL_OMP: If ON, OpenMP threading is requested. If OFF (default), sequential is used.
 #   Note: If ON, you must call find_package(OpenMP) before finding VendorPerfLibs.
@@ -91,10 +93,10 @@ if(VPL_OMP)
   endif()
 endif()
 
-set(_VPL_VALID_IDS "IntelMKL" "AOCL" "Generic")
+set(_VPL_VALID_IDS "IntelMKL" "AOCL" "NVPL" "Generic")
 function(check_VPL_ID var_name id_to_check)
   if(NOT id_to_check IN_LIST _VPL_VALID_IDS)
-    message(FATAL_ERROR "VendorPerfLibs: Unknown ${var_name} '${id_to_check}'. Acceptable values are: 'IntelMKL', 'AOCL', 'Generic'")
+    message(FATAL_ERROR "VendorPerfLibs: Unknown ${var_name} '${id_to_check}'. Acceptable values are: 'IntelMKL', 'AOCL', 'NVPL', 'Generic'")
   endif()
 endfunction()
 
@@ -106,6 +108,8 @@ macro(speculateVendor)
 
   find_library(AOCL_UTILS_LIB NAMES aoclutils)
 
+  find_package(nvpl QUIET)
+
   if(_MKL_CORE_TEST_LIB)
     set(VPL_ID_GUESS "IntelMKL")
     if(NOT VendorPerfLibs_FIND_QUIETLY)
@@ -115,6 +119,11 @@ macro(speculateVendor)
     set(VPL_ID_GUESS "AOCL")
     if(NOT VendorPerfLibs_FIND_QUIETLY)
       message(STATUS "Found aoclutils library file. Guessed VPL_ID 'AOCL'.")
+    endif()
+  elseif(nvpl_FOUND)
+    set(VPL_ID_GUESS "NVPL")
+    if(NOT VendorPerfLibs_FIND_QUIETLY)
+      message(STATUS "Found nvpl package. Guessed VPL_ID 'NVPL'.")
     endif()
   else()
     set(VPL_ID_GUESS "Generic")
@@ -138,7 +147,7 @@ else()
   check_VPL_ID("VPL_ID" "${VPL_ID}")
 endif()
 
-set(VPL_ID "${VPL_ID_GUESS}" CACHE STRING "Vendor Performance Library ID (IntelMKL, AOCL, Generic)")
+set(VPL_ID "${VPL_ID_GUESS}" CACHE STRING "Vendor Performance Library ID (IntelMKL, AOCL, NVPL, Generic)")
 
 set(_find_package_args)
 if(VendorPerfLibs_FIND_QUIETLY)
@@ -235,6 +244,17 @@ macro(find_VPL_core)
     if(NOT VendorPerfLibs_FIND_QUIETLY AND NOT (VendorPerfLibs_INCLUDE_DIR AND AOCL_UTILS_LIB))
       message(WARNING ${_vpl_warning_core_aocl} "If you'd like to fully opt out AOCL, set VPL_ID=Generic.")
     endif()
+  elseif(VPL_ID STREQUAL "NVPL")
+    if(CMAKE_VERSION VERSION_LESS 4.1)
+      message(FATAL_ERROR "VendorPerfLibs: NVPL support requires CMake 4.1 or newer (current: ${CMAKE_VERSION})")
+    endif()
+    find_package(nvpl QUIET)
+    if(NOT nvpl_FOUND)
+      set(VPL_CORE_FOUND FALSE)
+      if(NOT VendorPerfLibs_FIND_QUIETLY)
+        message(WARNING "NVPL not found. If you'd like to fully opt out NVPL, set VPL_ID=Generic.")
+      endif()
+    endif()
   endif()
 
   if(VPL_CORE_FOUND)
@@ -247,7 +267,7 @@ macro(find_VPL_core)
 endmacro()
 
 macro(find_VPL_lapack)
-  set(VPL_lapack_ID ${VPL_ID} CACHE STRING "Vendor LAPACK ID (IntelMKL, AOCL, Generic)")
+  set(VPL_lapack_ID ${VPL_ID} CACHE STRING "Vendor LAPACK ID (IntelMKL, AOCL, NVPL, Generic)")
   check_VPL_ID("VPL_lapack_ID" "${VPL_lapack_ID}")
 
   if(VPL_lapack_ID STREQUAL "IntelMKL")
@@ -273,6 +293,17 @@ macro(find_VPL_lapack)
       set(BLA_VENDOR "AOCL_mt")
     endif()
     find_package(LAPACK ${_find_package_args})
+  elseif(VPL_lapack_ID STREQUAL "NVPL")
+    if(NOT VPL_ID STREQUAL "NVPL")
+      message(FATAL_ERROR "VendorPerfLibs: VPL_lapack_ID is NVPL but VPL_ID is not NVPL. Unsupported.")
+    endif()
+    if(NOT VPL_OMP)
+      set(BLA_THREAD "SEQ")
+    else()
+      set(BLA_THREAD "OMP")
+    endif()
+    set(BLA_VENDOR "NVPL")
+    find_package(LAPACK ${_find_package_args})
   else()
     find_package(LAPACK ${_find_package_args})
   endif()
@@ -289,15 +320,16 @@ macro(find_VPL_lapack)
 endmacro()
 
 macro(find_VPL_fft)
-  set(VPL_fft_ID ${VPL_ID} CACHE STRING "Vendor FFT ID (IntelMKL, AOCL, Generic)")
+  set(VPL_fft_ID ${VPL_ID} CACHE STRING "Vendor FFT ID (IntelMKL, AOCL, NVPL, Generic)")
   check_VPL_ID("VPL_fft_ID" "${VPL_fft_ID}")
-  list(APPEND _vpl_required_vars VendorPerfLibs_FFTW_INCLUDE_DIR VPL_FFT_LIBRARIES)
+  list(APPEND _vpl_required_vars VPL_FFT_LIBRARIES)
 
   set(VPL_FFT_FOUND TRUE)
   if(VPL_fft_ID STREQUAL "IntelMKL")
     if(NOT VPL_ID STREQUAL "IntelMKL")
       message(FATAL_ERROR "VendorPerfLibs: VPL_fft_ID is IntelMKL but VPL_ID is not IntelMKL. Unsupported.")
     endif()
+    list(APPEND _vpl_required_vars VendorPerfLibs_FFTW_INCLUDE_DIR)
     find_path(VendorPerfLibs_FFTW_INCLUDE_DIR NAMES fftw3.f03
       HINTS
         "$ENV{MKLROOT}/include"
@@ -307,7 +339,18 @@ macro(find_VPL_fft)
     if(NOT VendorPerfLibs_FFTW_INCLUDE_DIR)
       set(VPL_FFT_FOUND FALSE)
     endif()
+  elseif(VPL_fft_ID STREQUAL "NVPL")
+    if(NOT VPL_ID STREQUAL "NVPL")
+      message(FATAL_ERROR "VendorPerfLibs: VPL_fft_ID is NVPL but VPL_ID is not NVPL. Unsupported.")
+    endif()
+    find_package(nvpl QUIET)
+    if(TARGET nvpl::fftw)
+      set(VPL_FFT_LIBRARIES nvpl::fftw)
+    else()
+      set(VPL_FFT_FOUND FALSE)
+    endif()
   else()
+    list(APPEND _vpl_required_vars VendorPerfLibs_FFTW_INCLUDE_DIR)
     # search for fftw
     if(VPL_OMP)
       find_package(FFTW ${_find_package_args} COMPONENTS seq omp)
@@ -338,7 +381,7 @@ macro(find_VPL_fft)
 endmacro()
 
 macro(find_VPL_vml)
-  set(VPL_vml_ID ${VPL_ID} CACHE STRING "Vendor VML ID (IntelMKL, AOCL, Generic)")
+  set(VPL_vml_ID ${VPL_ID} CACHE STRING "Vendor VML ID (IntelMKL, AOCL, NVPL, Generic)")
   check_VPL_ID("VPL_vml_ID" "${VPL_vml_ID}")
 
   set(VPL_VML_FOUND TRUE)
