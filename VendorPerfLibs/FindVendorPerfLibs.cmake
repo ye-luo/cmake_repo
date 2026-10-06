@@ -32,9 +32,10 @@
 # equivalents like Netlib LAPACK and FFTW) and provides a unified interface.
 #
 # This module supports the following components:
-# - lapack : Linear Algebra PACKage
-# - fft    : Fast Fourier Transform
-# - vml    : Vector Math Library
+# - lapack    : Linear Algebra PACKage
+# - scalapack : SCAlable Linear Algebra PACKage
+# - fft       : Fast Fourier Transform
+# - vml       : Vector Math Library
 #
 # Example usage:
 #   find_package(VendorPerfLibs COMPONENTS lapack fft vml REQUIRED)
@@ -42,6 +43,7 @@
 # This module creates the following CMake imported targets (if their
 # respective components are found):
 # - VPL::lapack
+# - VPL::scalapack
 # - VPL::fft
 # - VPL::vml
 #
@@ -67,8 +69,13 @@
 #   It is recommended to set the following in the project top-level for consistent selection of threading.
 #   option(VPL_OMP "Use OpenMP threading for Vendor Performance Libraries" ${<project_OpenMP_variable>})
 #
+# - VPL_MPI: Specifies the MPI layer for library components depending on MPI.
+#   Acceptable values are "openmpi" and "mpich" or left unset.
+#   Note: If VPL_MPI is set, you must call find_package(MPI) before finding VendorPerfLibs.
+#
 # Advanced Component-Specific Variables:
 # - VPL_lapack_ID: Overrides VPL_ID specifically for the LAPACK component.
+# - VPL_scalapack_ID: Overrides VPL_ID specifically for the ScaLAPACK component.
 # - VPL_fft_ID: Overrides VPL_ID specifically for the FFT component.
 # - VPL_vml_ID: Overrides VPL_ID specifically for the VML component.
 #
@@ -92,6 +99,20 @@ if(VPL_OMP)
     set(CMAKE_REQUIRED_LINK_OPTIONS ${OpenMP_C_FLAGS})
   elseif(CMAKE_CXX_COMPILER_LOADED AND OpenMP_CXX_FOUND)
     set(CMAKE_REQUIRED_LINK_OPTIONS ${OpenMP_CXX_FLAGS})
+  endif()
+endif()
+
+set(_VPL_VALID_MPIS "openmpi" "mpich")
+function(check_VPL_MPI var_name mpi_to_check)
+  if(NOT mpi_to_check IN_LIST _VPL_VALID_MPIS)
+    message(FATAL_ERROR "VendorPerfLibs: Unknown ${var_name} '${mpi_to_check}'. Acceptable values are: 'openmpi', 'mpich'")
+  endif()
+endfunction()
+
+if(VPL_MPI)
+  check_VPL_MPI("VPL_MPI" "${VPL_MPI}")
+  if(NOT MPI_FOUND)
+    message(FATAL_ERROR "VendorPerfLibs: VPL_MPI is set but MPI_FOUND is false. Please invoke find_package(MPI) before VendorPerfLibs.")
   endif()
 endif()
 
@@ -353,6 +374,113 @@ macro(find_VPL_lapack)
   endif()
 endmacro()
 
+macro(find_VPL_scalapack)
+  set(VPL_scalapack_ID ${VPL_ID} CACHE STRING "Vendor ScaLAPACK ID (IntelMKL, AOCL, ARMPL, NVPL, Generic)")
+  check_VPL_ID("VPL_scalapack_ID" "${VPL_scalapack_ID}")
+
+  set(VPL_SCALAPACK_FOUND TRUE)
+  if(VPL_scalapack_ID STREQUAL "IntelMKL")
+    if(NOT VPL_ID STREQUAL "IntelMKL")
+      message(FATAL_ERROR "VendorPerfLibs: VPL_scalapack_ID is IntelMKL but VPL_ID is not IntelMKL. Unsupported.")
+    endif()
+
+    get_filename_component(_mkl_core_dir "${_MKL_CORE_TEST_LIB}" DIRECTORY)
+
+    find_library(_MKL_SCALAPACK_LIB NAMES mkl_scalapack_lp64 HINTS ${_mkl_core_dir})
+
+    if(VPL_MPI STREQUAL "openmpi")
+      find_library(_MKL_BLACS_${VPL_MPI}_LIB NAMES mkl_blacs_openmpi_lp64 HINTS ${_mkl_core_dir})
+    elseif(VPL_MPI STREQUAL "mpich")
+      find_library(_MKL_BLACS_${VPL_MPI}_LIB NAMES mkl_blacs_intelmpi_lp64 mkl_blacs_mpich_lp64 HINTS ${_mkl_core_dir})
+    endif()
+
+    if(_MKL_SCALAPACK_LIB AND _MKL_BLACS_${VPL_MPI}_LIB AND VPL_CORE_LIBRARIES)
+      set(VPL_SCALAPACK_LIBRARIES ${_MKL_SCALAPACK_LIB} ${_MKL_BLACS_${VPL_MPI}_LIB} ${VPL_CORE_LIBRARIES})
+    else()
+      set(VPL_SCALAPACK_FOUND FALSE)
+    endif()
+  elseif(VPL_scalapack_ID STREQUAL "NVPL")
+    if(NOT VPL_ID STREQUAL "NVPL")
+      message(FATAL_ERROR "VendorPerfLibs: VPL_scalapack_ID is NVPL but VPL_ID is not NVPL. Unsupported.")
+    endif()
+
+    find_package(nvpl QUIET)
+
+    # Check for imported targets
+    if(TARGET nvpl::scalapack_lp64)
+      set(_NVPL_SCALAPACK_LIB nvpl::scalapack_lp64)
+    endif()
+
+    if(VPL_MPI STREQUAL "openmpi")
+      set(_mpi_lib_ver)
+      if(CMAKE_Fortran_COMPILER_LOADED AND MPI_Fortran_LIBRARY_VERSION_STRING)
+        set(_mpi_lib_ver "${MPI_Fortran_LIBRARY_VERSION_STRING}")
+      elseif(CMAKE_C_COMPILER_LOADED AND MPI_C_LIBRARY_VERSION_STRING)
+        set(_mpi_lib_ver "${MPI_C_LIBRARY_VERSION_STRING}")
+      elseif(CMAKE_CXX_COMPILER_LOADED AND MPI_CXX_LIBRARY_VERSION_STRING)
+        set(_mpi_lib_ver "${MPI_CXX_LIBRARY_VERSION_STRING}")
+      endif()
+
+      set(_openmpi_major)
+      if(_mpi_lib_ver MATCHES "Open[ -]?MPI[ \tv]*([0-9]+)")
+        set(_openmpi_major "${CMAKE_MATCH_1}")
+      elseif(_mpi_lib_ver MATCHES "([0-9]+)\\.[0-9]+")
+        set(_openmpi_major "${CMAKE_MATCH_1}")
+      endif()
+
+      if(_openmpi_major)
+        set(_openmpi_target "nvpl::blacs_lp64_openmpi${_openmpi_major}")
+      else()
+        set(_openmpi_target "nvpl::blacs_lp64_openmpi5")
+      endif()
+
+      if(TARGET ${_openmpi_target})
+        set(_NVPL_BLACS_${VPL_MPI}_LIB ${_openmpi_target})
+      endif()
+      unset(_mpi_lib_ver)
+      unset(_openmpi_major)
+      unset(_openmpi_target)
+    elseif(VPL_MPI STREQUAL "mpich")
+      if(TARGET nvpl::blacs_lp64_mpich)
+        set(_NVPL_BLACS_${VPL_MPI}_LIB nvpl::blacs_lp64_mpich)
+      endif()
+    endif()
+
+    if(_NVPL_SCALAPACK_LIB AND _NVPL_BLACS_${VPL_MPI}_LIB)
+      set(VPL_SCALAPACK_LIBRARIES ${_NVPL_SCALAPACK_LIB} ${_NVPL_BLACS_${VPL_MPI}_LIB} ${LAPACK_LIBRARIES})
+    else()
+      set(VPL_SCALAPACK_FOUND FALSE)
+    endif()
+  else()
+    set(SCALAPACK_FOUND TRUE)
+    if(NOT SCALAPACK_LIBRARIES)
+      find_library(SCALAPACK_LIBRARY NAMES scalapack-${VPL_MPI} scalapack)
+      if(SCALAPACK_LIBRARY)
+        message(STATUS "Found ScaLAPACK: ${SCALAPACK_LIBRARY}")
+        set(SCALAPACK_LIBRARIES ${SCALAPACK_LIBRARY} ${LAPACK_LIBRARIES})
+      else()
+        set(SCALAPACK_FOUND FALSE)
+      endif()
+    endif()
+
+    if(SCALAPACK_FOUND)
+      set(VPL_SCALAPACK_LIBRARIES ${SCALAPACK_LIBRARIES})
+    else()
+      set(VPL_SCALAPACK_FOUND FALSE)
+    endif()
+  endif()
+
+  if(VPL_SCALAPACK_FOUND)
+    list(APPEND _vpl_lib_found_ids "scalapack(${VPL_scalapack_ID})")
+    set(VendorPerfLibs_scalapack_FOUND TRUE)
+  else()
+    set(VendorPerfLibs_scalapack_FOUND FALSE)
+    if(NOT VendorPerfLibs_FIND_QUIETLY)
+      message(WARNING "ScaLAPACK for VPL_scalapack_ID '${VPL_scalapack_ID}', not found")
+    endif()
+  endif()
+endmacro()
+
 macro(find_VPL_fft)
   set(VPL_fft_ID ${VPL_ID} CACHE STRING "Vendor FFT ID (IntelMKL, AOCL, ARMPL, NVPL, Generic)")
   check_VPL_ID("VPL_fft_ID" "${VPL_fft_ID}")
@@ -475,8 +603,24 @@ set(_vpl_lib_found_ids)
 set(_vpl_required_vars _vpl_lib_found_ids)
 find_VPL_core()
 
-if(NOT VendorPerfLibs_FIND_COMPONENTS OR "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+if(NOT VendorPerfLibs_FIND_COMPONENTS OR "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS OR "scalapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
   find_VPL_lapack()
+endif()
+
+if(NOT VendorPerfLibs_FIND_COMPONENTS OR "scalapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+  if(VendorPerfLibs_lapack_FOUND AND VPL_MPI)
+    find_VPL_scalapack()
+  else()
+    set(VendorPerfLibs_scalapack_FOUND FALSE)
+    if(NOT VendorPerfLibs_FIND_QUIETLY)
+      if(NOT VendorPerfLibs_lapack_FOUND)
+        message(WARNING "ScaLAPACK requires LAPACK to be found")
+      endif()
+      if(NOT VPL_MPI)
+        message(WARNING "ScaLAPACK requires VPL_MPI to be set to 'openmpi' or 'mpich'")
+      endif()
+    endif()
+  endif()
 endif()
 
 if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
@@ -502,6 +646,18 @@ if(VendorPerfLibs_FOUND)
         INTERFACE_LINK_LIBRARIES "${LAPACK_LIBRARIES}"
       )
       add_library(VPL::lapack ALIAS vpl_lapack)
+    endif()
+  endif()
+
+  # Create vpl_scalapack
+  if(NOT VendorPerfLibs_FIND_COMPONENTS OR "scalapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
+    if(NOT TARGET vpl_scalapack)
+      add_library(vpl_scalapack INTERFACE IMPORTED)
+      set_target_properties(vpl_scalapack PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR}"
+        INTERFACE_LINK_LIBRARIES "${VPL_SCALAPACK_LIBRARIES}"
+      )
+      add_library(VPL::scalapack ALIAS vpl_scalapack)
     endif()
   endif()
 
@@ -537,3 +693,4 @@ unset(_find_package_args)
 unset(_vpl_required_vars)
 unset(_vpl_lib_found_ids)
 unset(_VPL_VALID_IDS)
+unset(_VPL_VALID_MPIS)
