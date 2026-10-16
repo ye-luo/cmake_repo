@@ -50,11 +50,12 @@
 # Input variables:
 # - VPL_ID: Specifies the vendor performance library family to search for.
 #   Acceptable values are:
-#     - "IntelMKL" : Intel Math Kernel Library
-#     - "AOCL"     : AMD Optimizing CPU Libraries
-#     - "ARMPL"    : Arm Performance Libraries
-#     - "NVPL"     : NVIDIA Performance Libraries
-#     - "Generic"  : Generic libraries (e.g., standard BLAS/LAPACK and FFTW)
+#     - "IntelMKL"   : Intel Math Kernel Library
+#     - "AOCL"       : AMD Optimizing CPU Libraries
+#     - "ARMPL"      : Arm Performance Libraries
+#     - "NVPL"       : NVIDIA Performance Libraries
+#     - "CrayLibSci" : Cray Scientific Library
+#     - "Generic"    : Generic libraries (e.g., standard BLAS/LAPACK and FFTW)
 #   Note: If VPL_ID is not set, the following rules determine its value
 #   (once a rule applies, the subsequent rules are ignored):
 #     1. "Generic" if BLA_VENDOR was specified.
@@ -62,7 +63,8 @@
 #     3. "AOCL" if the AOCL aoclutils library file was found.
 #     4. "ARMPL" if the ArmPL library file was found.
 #     5. "NVPL" if the nvpl CMake package was found.
-#     6. "Generic" if all previous rules fail.
+#     6. "CrayLibSci" if the Cray libsci pkg-config package was found.
+#     7. "Generic" if all previous rules fail.
 #
 # - VPL_OMP: If ON, OpenMP threading is requested. If OFF (default), sequential is used.
 #   Note: If ON, you must call find_package(OpenMP) before finding VendorPerfLibs.
@@ -81,7 +83,13 @@
 #
 
 include(FindPackageHandleStandardArgs)
+include(FindPackageMessage)
 include(CMakePushCheckState)
+find_package(PkgConfig QUIET)
+
+if(DEFINED ENV{CRAY_LIBSCI_PREFIX_DIR})
+  list(APPEND CMAKE_PREFIX_PATH "$ENV{CRAY_LIBSCI_PREFIX_DIR}")
+endif()
 
 if(NOT (CMAKE_C_COMPILER_LOADED OR CMAKE_CXX_COMPILER_LOADED))
   message(FATAL_ERROR "VendorPerfLibs: C or CXX compiler must be loaded before calling find_package(VendorPerfLibs)")
@@ -116,10 +124,10 @@ if(VPL_MPI)
   endif()
 endif()
 
-set(_VPL_VALID_IDS "IntelMKL" "AOCL" "ARMPL" "NVPL" "Generic")
+set(_VPL_VALID_IDS "IntelMKL" "AOCL" "ARMPL" "NVPL" "CrayLibSci" "Generic")
 function(check_VPL_ID var_name id_to_check)
   if(NOT id_to_check IN_LIST _VPL_VALID_IDS)
-    message(FATAL_ERROR "VendorPerfLibs: Unknown ${var_name} '${id_to_check}'. Acceptable values are: 'IntelMKL', 'AOCL', 'ARMPL', 'NVPL', 'Generic'")
+    message(FATAL_ERROR "VendorPerfLibs: Unknown ${var_name} '${id_to_check}'. Acceptable values are: 'IntelMKL', 'AOCL', 'ARMPL', 'NVPL', 'CrayLibSci', 'Generic'")
   endif()
 endfunction()
 
@@ -134,6 +142,10 @@ macro(speculateVendor)
   find_library(_ARMPL_TEST_LIB NAMES armpl_lp64 armpl_lp64_mp armpl)
 
   find_package(nvpl QUIET)
+
+  if(PkgConfig_FOUND)
+    pkg_check_modules(_CRAY_LIBSCI_PKG QUIET sci)
+  endif()
 
   if(_MKL_CORE_TEST_LIB)
     set(VPL_ID_GUESS "IntelMKL")
@@ -155,6 +167,11 @@ macro(speculateVendor)
     if(NOT VendorPerfLibs_FIND_QUIETLY)
       message(STATUS "Found nvpl package. Guessed VPL_ID 'NVPL'.")
     endif()
+  elseif(_CRAY_LIBSCI_PKG_FOUND)
+    set(VPL_ID_GUESS "CrayLibSci")
+    if(NOT VendorPerfLibs_FIND_QUIETLY)
+      message(STATUS "Found Cray libsci pkg-config package. Guessed VPL_ID 'CrayLibSci'.")
+    endif()
   else()
     set(VPL_ID_GUESS "Generic")
     if(NOT VendorPerfLibs_FIND_QUIETLY)
@@ -175,9 +192,10 @@ if(NOT VPL_ID)
   endif()
 else()
   check_VPL_ID("VPL_ID" "${VPL_ID}")
+  set(VPL_ID_GUESS "${VPL_ID}")
 endif()
 
-set(VPL_ID "${VPL_ID_GUESS}" CACHE STRING "Vendor Performance Library ID (IntelMKL, AOCL, ARMPL, NVPL, Generic)")
+set(VPL_ID "${VPL_ID_GUESS}" CACHE STRING "Vendor Performance Library ID (IntelMKL, AOCL, ARMPL, NVPL, CrayLibSci, Generic)")
 
 set(_find_package_args)
 if(VendorPerfLibs_FIND_QUIETLY)
@@ -304,6 +322,45 @@ macro(find_VPL_core)
         message(WARNING "NVPL not found. If you'd like to fully opt out NVPL, set VPL_ID=Generic.")
       endif()
     endif()
+  elseif(VPL_ID STREQUAL "CrayLibSci")
+    list(APPEND _vpl_required_vars VendorPerfLibs_INCLUDE_DIR)
+
+    if(VPL_OMP)
+      set(_cray_libsci_name "sci_mp")
+    else()
+      set(_cray_libsci_name "sci")
+    endif()
+
+    set(BLA_PREFER_PKGCONFIG ON)
+    set(BLA_PKGCONFIG_BLAS ${_cray_libsci_name})
+    find_package(BLAS ${_find_package_args})
+    if(BLAS_FOUND)
+      set(BLAS_FIND_QUIETLY ${VendorPerfLibs_FIND_QUIETLY})
+      find_package_message(BLAS "Found BLAS: ${BLAS_LIBRARIES}" "[${BLAS_LIBRARIES}]")
+    endif()
+
+    find_path(VendorPerfLibs_INCLUDE_DIR
+      NAMES cblas.h lapacke.h
+      HINTS
+        ${PKGC_BLAS_INCLUDE_DIRS}
+        ${BLAS_INCLUDE_DIRS}
+      PATH_SUFFIXES include
+    )
+
+    if(NOT (BLAS_FOUND AND VendorPerfLibs_INCLUDE_DIR))
+      set(VPL_CORE_FOUND FALSE)
+      if(NOT VendorPerfLibs_FIND_QUIETLY)
+        set(_vpl_warning_core_cray)
+        if(NOT VendorPerfLibs_INCLUDE_DIR)
+          list(APPEND _vpl_warning_core_cray "Cray libsci header file cblas.h not found.\n")
+        endif()
+        if(NOT BLAS_FOUND)
+          list(APPEND _vpl_warning_core_cray "Cray libsci BLAS library not found.\n")
+        endif()
+        message(WARNING ${_vpl_warning_core_cray} "If you'd like to fully opt out Cray libsci, set VPL_ID=Generic.")
+      endif()
+    endif()
+    unset(_cray_libsci_name)
   endif()
 
   if(VPL_CORE_FOUND)
@@ -312,7 +369,7 @@ macro(find_VPL_core)
 endmacro()
 
 macro(find_VPL_lapack)
-  set(VPL_lapack_ID ${VPL_ID} CACHE STRING "Vendor LAPACK ID (IntelMKL, AOCL, ARMPL, NVPL, Generic)")
+  set(VPL_lapack_ID ${VPL_ID} CACHE STRING "Vendor LAPACK ID (IntelMKL, AOCL, ARMPL, NVPL, CrayLibSci, Generic)")
   check_VPL_ID("VPL_lapack_ID" "${VPL_lapack_ID}")
 
   if(VPL_lapack_ID STREQUAL "IntelMKL")
@@ -359,6 +416,22 @@ macro(find_VPL_lapack)
     endif()
     set(BLA_VENDOR "NVPL")
     find_package(LAPACK ${_find_package_args})
+  elseif(VPL_lapack_ID STREQUAL "CrayLibSci")
+    if(NOT VPL_ID STREQUAL "CrayLibSci")
+      message(FATAL_ERROR "VendorPerfLibs: VPL_lapack_ID is CrayLibSci but VPL_ID is not CrayLibSci. Unsupported.")
+    endif()
+    if(VPL_OMP)
+      set(_cray_libsci_name "sci_mp")
+    else()
+      set(_cray_libsci_name "sci")
+    endif()
+    set(BLA_PKGCONFIG_LAPACK ${_cray_libsci_name})
+    find_package(LAPACK ${_find_package_args})
+    if(LAPACK_FOUND)
+      set(LAPACK_FIND_QUIETLY ${VendorPerfLibs_FIND_QUIETLY})
+      find_package_message(LAPACK "Found LAPACK: ${LAPACK_LIBRARIES}" "[${LAPACK_LIBRARIES}]")
+    endif()
+    unset(_cray_libsci_name)
   else()
     find_package(LAPACK ${_find_package_args})
   endif()
@@ -375,7 +448,7 @@ macro(find_VPL_lapack)
 endmacro()
 
 macro(find_VPL_scalapack)
-  set(VPL_scalapack_ID ${VPL_ID} CACHE STRING "Vendor ScaLAPACK ID (IntelMKL, AOCL, ARMPL, NVPL, Generic)")
+  set(VPL_scalapack_ID ${VPL_ID} CACHE STRING "Vendor ScaLAPACK ID (IntelMKL, AOCL, ARMPL, NVPL, CrayLibSci, Generic)")
   check_VPL_ID("VPL_scalapack_ID" "${VPL_scalapack_ID}")
 
   set(VPL_SCALAPACK_FOUND TRUE)
@@ -451,12 +524,35 @@ macro(find_VPL_scalapack)
     else()
       set(VPL_SCALAPACK_FOUND FALSE)
     endif()
+  elseif(VPL_scalapack_ID STREQUAL "CrayLibSci")
+    if(NOT VPL_ID STREQUAL "CrayLibSci")
+      message(FATAL_ERROR "VendorPerfLibs: VPL_scalapack_ID is CrayLibSci but VPL_ID is not CrayLibSci. Unsupported.")
+    endif()
+
+    if(VPL_OMP)
+      set(_cray_libsci_mpi_name "sci_mpi_mp")
+    else()
+      set(_cray_libsci_mpi_name "sci_mpi")
+    endif()
+
+    if(PkgConfig_FOUND)
+      if(DEFINED ENV{CRAY_MPICH_PREFIX})
+        list(APPEND CMAKE_PREFIX_PATH "$ENV{CRAY_MPICH_PREFIX}")
+      endif()
+      pkg_check_modules(_CRAY_SCALAPACK QUIET ${_cray_libsci_mpi_name})
+    endif()
+
+    if(_CRAY_SCALAPACK_FOUND)
+      set(VPL_SCALAPACK_LIBRARIES ${_CRAY_SCALAPACK_LINK_LIBRARIES})
+    else()
+      set(VPL_SCALAPACK_FOUND FALSE)
+    endif()
+    unset(_cray_libsci_mpi_name)
   else()
     set(SCALAPACK_FOUND TRUE)
     if(NOT SCALAPACK_LIBRARIES)
       find_library(SCALAPACK_LIBRARY NAMES scalapack-${VPL_MPI} scalapack)
       if(SCALAPACK_LIBRARY)
-        message(STATUS "Found ScaLAPACK: ${SCALAPACK_LIBRARY}")
         set(SCALAPACK_LIBRARIES ${SCALAPACK_LIBRARY} ${LAPACK_LIBRARIES})
       else()
         set(SCALAPACK_FOUND FALSE)
@@ -473,6 +569,8 @@ macro(find_VPL_scalapack)
   if(VPL_SCALAPACK_FOUND)
     list(APPEND _vpl_lib_found_ids "scalapack(${VPL_scalapack_ID})")
     set(VendorPerfLibs_scalapack_FOUND TRUE)
+    set(ScaLAPACK_FIND_QUIETLY ${VendorPerfLibs_FIND_QUIETLY})
+    find_package_message(ScaLAPACK "Found ScaLAPACK: ${VPL_SCALAPACK_LIBRARIES}" "[${VPL_SCALAPACK_LIBRARIES}]")
   else()
     set(VendorPerfLibs_scalapack_FOUND FALSE)
     if(NOT VendorPerfLibs_FIND_QUIETLY)
@@ -482,7 +580,7 @@ macro(find_VPL_scalapack)
 endmacro()
 
 macro(find_VPL_fft)
-  set(VPL_fft_ID ${VPL_ID} CACHE STRING "Vendor FFT ID (IntelMKL, AOCL, ARMPL, NVPL, Generic)")
+  set(VPL_fft_ID ${VPL_ID} CACHE STRING "Vendor FFT ID (IntelMKL, AOCL, ARMPL, NVPL, CrayLibSci, Generic)")
   check_VPL_ID("VPL_fft_ID" "${VPL_fft_ID}")
   list(APPEND _vpl_required_vars VPL_FFT_LIBRARIES)
 
@@ -553,7 +651,7 @@ macro(find_VPL_fft)
 endmacro()
 
 macro(find_VPL_vml)
-  set(VPL_vml_ID ${VPL_ID} CACHE STRING "Vendor VML ID (IntelMKL, AOCL, ARMPL, NVPL, Generic)")
+  set(VPL_vml_ID ${VPL_ID} CACHE STRING "Vendor VML ID (IntelMKL, AOCL, ARMPL, NVPL, CrayLibSci, Generic)")
   check_VPL_ID("VPL_vml_ID" "${VPL_vml_ID}")
 
   set(VPL_VML_FOUND TRUE)
@@ -583,7 +681,7 @@ macro(find_VPL_vml)
       set(VPL_VML_FOUND FALSE)
     endif()
   else()
-    # VML for NVPL, Generic is not currently supported (e.g. no direct open source drop-in)
+    # VML for NVPL, CrayLibSci, Generic is not currently supported (e.g. no direct open source drop-in)
     set(VPL_VML_FOUND FALSE)
   endif()
 
