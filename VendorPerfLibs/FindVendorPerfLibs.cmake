@@ -165,10 +165,19 @@ endmacro()
 
 _vpl_save_BLA_vars()
 
+# MKL search hints from MKLROOT. Only add them when MKLROOT is set: otherwise "$ENV{MKLROOT}/include" would
+# expand to "/include" and search the filesystem root.
+set(_VPL_MKL_LIB_HINTS)
+set(_VPL_MKL_INC_HINTS)
+if(DEFINED ENV{MKLROOT} AND NOT "$ENV{MKLROOT}" STREQUAL "")
+  set(_VPL_MKL_LIB_HINTS "$ENV{MKLROOT}/lib/intel64" "$ENV{MKLROOT}/lib")
+  set(_VPL_MKL_INC_HINTS "$ENV{MKLROOT}/include")
+endif()
+
 macro(speculateVendor)
   find_library(_MKL_CORE_TEST_LIB NAMES mkl_core
     HINTS
-      "$ENV{MKLROOT}/lib/intel64"
+      ${_VPL_MKL_LIB_HINTS}
   )
 
   find_library(AOCL_UTILS_LIB NAMES aoclutils)
@@ -273,7 +282,7 @@ macro(find_VPL_core)
     # Try to find MKL include directory
     find_path(VendorPerfLibs_INCLUDE_DIR NAMES mkl.h
       HINTS
-        "$ENV{MKLROOT}/include"
+        ${_VPL_MKL_INC_HINTS}
       PATH_SUFFIXES mkl
     )
 
@@ -291,7 +300,7 @@ macro(find_VPL_core)
           # exactly the same check as in speculateVendor in case it was not called.
           find_library(_MKL_CORE_TEST_LIB NAMES mkl_core
             HINTS
-              "$ENV{MKLROOT}/lib/intel64"
+              ${_VPL_MKL_LIB_HINTS}
           )
           if(_MKL_CORE_TEST_LIB)
             list(APPEND _vpl_warning_core_mkl "Intel mkl_core library file was found. FindBLAS failed most likely when testing linking MKL for complex reasons.\n")
@@ -626,7 +635,7 @@ macro(find_VPL_fft)
     endif()
     find_path(VendorPerfLibs_FFTW_INCLUDE_DIR NAMES fftw3.f03
       HINTS
-        "$ENV{MKLROOT}/include"
+        ${_VPL_MKL_INC_HINTS}
       PATH_SUFFIXES fftw mkl/fftw
     )
     set(VPL_FFT_LIBRARIES ${VPL_CORE_LIBRARIES})
@@ -842,6 +851,8 @@ cmake_pop_check_state()
 
 # Scope cleanup
 unset(_VPL_BLA_VARS)
+unset(_VPL_MKL_LIB_HINTS)
+unset(_VPL_MKL_INC_HINTS)
 foreach(_vpl_id_var IN LISTS _vpl_defaulted_ids)
   unset(${_vpl_id_var})
 endforeach()
