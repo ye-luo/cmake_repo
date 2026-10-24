@@ -344,7 +344,11 @@ macro(find_VPL_core)
 endmacro()
 
 macro(find_VPL_lapack)
-  set(VPL_lapack_ID ${VPL_ID} CACHE STRING "Vendor LAPACK ID (IntelMKL, AOCL, ARMPL, NVPL, CrayLibSci, Generic)")
+  # Default to VPL_ID without caching, so that changing VPL_ID later is not defeated by a stale cached value.
+  if(NOT VPL_lapack_ID)
+    set(VPL_lapack_ID "${VPL_ID}")
+    list(APPEND _vpl_defaulted_ids VPL_lapack_ID)
+  endif()
   check_VPL_ID("VPL_lapack_ID" "${VPL_lapack_ID}")
 
   if(VPL_lapack_ID STREQUAL "IntelMKL")
@@ -423,7 +427,11 @@ macro(find_VPL_lapack)
 endmacro()
 
 macro(find_VPL_fft)
-  set(VPL_fft_ID ${VPL_ID} CACHE STRING "Vendor FFT ID (IntelMKL, AOCL, ARMPL, NVPL, CrayLibSci, Generic)")
+  # Default to VPL_ID without caching, so that changing VPL_ID later is not defeated by a stale cached value.
+  if(NOT VPL_fft_ID)
+    set(VPL_fft_ID "${VPL_ID}")
+    list(APPEND _vpl_defaulted_ids VPL_fft_ID)
+  endif()
   check_VPL_ID("VPL_fft_ID" "${VPL_fft_ID}")
   list(APPEND _vpl_required_vars VPL_FFT_LIBRARIES)
 
@@ -494,7 +502,11 @@ macro(find_VPL_fft)
 endmacro()
 
 macro(find_VPL_vml)
-  set(VPL_vml_ID ${VPL_ID} CACHE STRING "Vendor VML ID (IntelMKL, AOCL, ARMPL, NVPL, CrayLibSci, Generic)")
+  # Default to VPL_ID without caching, so that changing VPL_ID later is not defeated by a stale cached value.
+  if(NOT VPL_vml_ID)
+    set(VPL_vml_ID "${VPL_ID}")
+    list(APPEND _vpl_defaulted_ids VPL_vml_ID)
+  endif()
   check_VPL_ID("VPL_vml_ID" "${VPL_vml_ID}")
 
   set(VPL_VML_FOUND TRUE)
@@ -540,6 +552,7 @@ macro(find_VPL_vml)
   endif()
 endmacro()
 
+set(_vpl_defaulted_ids)
 set(_vpl_lib_found_ids)
 set(_vpl_required_vars _vpl_lib_found_ids)
 find_VPL_core()
@@ -602,6 +615,11 @@ endif()
 cmake_pop_check_state()
 
 # Scope cleanup
+foreach(_vpl_id_var IN LISTS _vpl_defaulted_ids)
+  unset(${_vpl_id_var})
+endforeach()
+unset(_vpl_id_var)
+unset(_vpl_defaulted_ids)
 unset(_find_package_args)
 unset(_vpl_required_vars)
 unset(_vpl_lib_found_ids)
