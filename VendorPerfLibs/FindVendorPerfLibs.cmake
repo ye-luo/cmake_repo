@@ -465,7 +465,19 @@ macro(find_VPL_scalapack)
       message(FATAL_ERROR "VendorPerfLibs: VPL_scalapack_ID is IntelMKL but VPL_ID is not IntelMKL. Unsupported.")
     endif()
 
-    get_filename_component(_mkl_core_dir "${_MKL_CORE_TEST_LIB}" DIRECTORY)
+    # Locate the MKL library directory from the libraries actually selected by FindBLAS, so that it also works
+    # when speculateVendor() was skipped (VPL_ID set explicitly) and stays consistent with the MKL in use.
+    set(_mkl_core_libs ${VPL_CORE_LIBRARIES})
+    list(FILTER _mkl_core_libs INCLUDE REGEX "mkl_core")
+    set(_mkl_core_lib)
+    if(_mkl_core_libs)
+      list(GET _mkl_core_libs 0 _mkl_core_lib)
+    else()
+      set(_mkl_core_lib "${_MKL_CORE_TEST_LIB}")
+    endif()
+    get_filename_component(_mkl_core_dir "${_mkl_core_lib}" DIRECTORY)
+    unset(_mkl_core_libs)
+    unset(_mkl_core_lib)
 
     find_library(_MKL_SCALAPACK_LIB NAMES mkl_scalapack_lp64 HINTS ${_mkl_core_dir})
 
