@@ -52,6 +52,13 @@
 # - VPL::fft
 # - VPL::vml
 #
+# These imported targets are the supported interface of this module. Link against them rather than
+# relying on any other variable set by this module.
+#
+# Result variables:
+# - VendorPerfLibs_FOUND         : TRUE if the requested components were found.
+# - VendorPerfLibs_<comp>_FOUND  : TRUE if component <comp> (lapack, scalapack, fft or vml) was found.
+#
 # Input variables:
 # - VPL_ID: Specifies the vendor performance library family to search for.
 #   Acceptable values are:
@@ -275,6 +282,7 @@ else()
 endif()
 
 set(VPL_ID "${VPL_ID_GUESS}" CACHE STRING "Vendor Performance Library ID (IntelMKL, AOCL, ARMPL, NVPL, CrayLibSci, Generic)")
+set_property(CACHE VPL_ID PROPERTY STRINGS ${_VPL_VALID_IDS})
 
 set(_find_package_args)
 if(VendorPerfLibs_FIND_QUIETLY)
