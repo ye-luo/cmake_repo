@@ -263,7 +263,12 @@ macro(find_VPL_core)
 
     if(BLAS_FOUND AND VendorPerfLibs_INCLUDE_DIR)
       warn_MKL_Fortran_ABI_issue(BLAS_LIBRARIES)
-      set(VPL_CORE_LIBRARIES ${BLAS_LIBRARIES})
+      # Prefer the BLAS::BLAS target: unlike BLAS_LIBRARIES it also carries BLAS_LINKER_FLAGS.
+      if(TARGET BLAS::BLAS)
+        set(VPL_CORE_LIBRARIES BLAS::BLAS)
+      else()
+        set(VPL_CORE_LIBRARIES ${BLAS_LIBRARIES})
+      endif()
     else()
       set(VPL_CORE_FOUND FALSE)
       if(NOT VendorPerfLibs_FIND_QUIETLY)
@@ -315,7 +320,12 @@ macro(find_VPL_core)
     find_path(VendorPerfLibs_INCLUDE_DIR NAMES armpl.h)
 
     if(BLAS_FOUND AND VendorPerfLibs_INCLUDE_DIR)
-      set(VPL_CORE_LIBRARIES ${BLAS_LIBRARIES})
+      # Prefer the BLAS::BLAS target: unlike BLAS_LIBRARIES it also carries BLAS_LINKER_FLAGS.
+      if(TARGET BLAS::BLAS)
+        set(VPL_CORE_LIBRARIES BLAS::BLAS)
+      else()
+        set(VPL_CORE_LIBRARIES ${BLAS_LIBRARIES})
+      endif()
     else()
       set(VPL_CORE_FOUND FALSE)
       if(NOT VendorPerfLibs_FIND_QUIETLY)
@@ -437,6 +447,12 @@ macro(find_VPL_lapack)
   endif()
 
   if(LAPACK_FOUND)
+    # Prefer the LAPACK::LAPACK target: unlike LAPACK_LIBRARIES it also carries LAPACK_LINKER_FLAGS.
+    if(TARGET LAPACK::LAPACK)
+      set(VPL_LAPACK_LINK LAPACK::LAPACK)
+    else()
+      set(VPL_LAPACK_LINK ${LAPACK_LIBRARIES})
+    endif()
     list(APPEND _vpl_lib_found_ids "lapack(${VPL_ID})")
     set(VendorPerfLibs_lapack_FOUND TRUE)
   else()
@@ -571,6 +587,8 @@ endmacro()
 
 set(_vpl_defaulted_ids)
 unset(VendorPerfLibs_lapack_FOUND)
+unset(VPL_CORE_LIBRARIES)
+unset(VPL_LAPACK_LINK)
 set(_vpl_lib_found_ids)
 set(_vpl_required_vars _vpl_lib_found_ids)
 find_VPL_core()
@@ -599,7 +617,7 @@ if(VendorPerfLibs_FOUND)
       add_library(vpl_lapack INTERFACE IMPORTED)
       set_target_properties(vpl_lapack PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR}"
-        INTERFACE_LINK_LIBRARIES "${LAPACK_LIBRARIES}"
+        INTERFACE_LINK_LIBRARIES "${VPL_LAPACK_LINK}"
       )
       add_library(VPL::lapack ALIAS vpl_lapack)
     endif()
@@ -650,6 +668,8 @@ cmake_pop_check_state()
 
 # Scope cleanup
 unset(_VPL_BLA_VARS)
+unset(VPL_CORE_LIBRARIES)
+unset(VPL_LAPACK_LINK)
 unset(_VPL_MKL_LIB_HINTS)
 unset(_VPL_MKL_INC_HINTS)
 foreach(_vpl_id_var IN LISTS _vpl_defaulted_ids)
