@@ -89,17 +89,23 @@ if(VPL_OMP)
   if(NOT OpenMP_FOUND)
     message(FATAL_ERROR "VendorPerfLibs: VPL_OMP is ON but OpenMP_FOUND is false. Please invoke find_package(OpenMP) before VendorPerfLibs.")
   endif()
+  # CMAKE_REQUIRED_LINK_OPTIONS expects a list, whereas OpenMP_<lang>_FLAGS is a space-separated string.
+  # (CMAKE_REQUIRED_LIBRARIES cannot be used here since FindBLAS/FindLAPACK overwrite it.)
+  set(_vpl_omp_flags)
   if(CMAKE_Fortran_COMPILER_LOADED AND OpenMP_Fortran_FOUND)
-    set(CMAKE_REQUIRED_LINK_OPTIONS ${OpenMP_Fortran_FLAGS})
+    separate_arguments(_vpl_omp_flags NATIVE_COMMAND "${OpenMP_Fortran_FLAGS}")
   elseif(CMAKE_C_COMPILER_LOADED AND OpenMP_C_FOUND)
-    set(CMAKE_REQUIRED_LINK_OPTIONS ${OpenMP_C_FLAGS})
+    separate_arguments(_vpl_omp_flags NATIVE_COMMAND "${OpenMP_C_FLAGS}")
   elseif(CMAKE_CXX_COMPILER_LOADED AND OpenMP_CXX_FOUND)
-    set(CMAKE_REQUIRED_LINK_OPTIONS ${OpenMP_CXX_FLAGS})
+    separate_arguments(_vpl_omp_flags NATIVE_COMMAND "${OpenMP_CXX_FLAGS}")
   endif()
+  set(CMAKE_REQUIRED_LINK_OPTIONS ${_vpl_omp_flags})
+  unset(_vpl_omp_flags)
 endif()
 
+
 set(_VPL_VALID_IDS "IntelMKL" "AOCL" "ARMPL" "NVPL" "CrayLibSci" "Generic")
-function(check_VPL_ID var_name id_to_check)
+function(_vpl_check_ID var_name id_to_check)
   if(NOT id_to_check IN_LIST _VPL_VALID_IDS)
     message(FATAL_ERROR "VendorPerfLibs: Unknown ${var_name} '${id_to_check}'. Acceptable values are: 'IntelMKL', 'AOCL', 'ARMPL', 'NVPL', 'CrayLibSci', 'Generic'")
   endif()
@@ -149,13 +155,13 @@ if(DEFINED ENV{MKLROOT} AND NOT "$ENV{MKLROOT}" STREQUAL "")
   set(_VPL_MKL_INC_HINTS "$ENV{MKLROOT}/include")
 endif()
 
-macro(speculateVendor)
+macro(_vpl_speculate_vendor)
   find_library(_MKL_CORE_TEST_LIB NAMES mkl_core
     HINTS
       ${_VPL_MKL_LIB_HINTS}
   )
 
-  find_library(AOCL_UTILS_LIB NAMES aoclutils)
+  find_library(_AOCL_UTILS_LIB NAMES aoclutils)
 
   find_library(_ARMPL_TEST_LIB NAMES armpl_lp64 armpl_lp64_mp armpl)
 
@@ -170,7 +176,7 @@ macro(speculateVendor)
     if(NOT VendorPerfLibs_FIND_QUIETLY)
       message(STATUS "Found mkl_core library file. Guessed VPL_ID 'IntelMKL'.")
     endif()
-  elseif(AOCL_UTILS_LIB)
+  elseif(_AOCL_UTILS_LIB)
     set(VPL_ID_GUESS "AOCL")
     if(NOT VendorPerfLibs_FIND_QUIETLY)
       message(STATUS "Found aoclutils library file. Guessed VPL_ID 'AOCL'.")
@@ -206,10 +212,10 @@ if(NOT VPL_ID)
       message(STATUS "BLA_VENDOR has been set to '${BLA_VENDOR}'. Guessed VPL_ID 'Generic'.")
     endif()
   else()
-    speculateVendor()
+    _vpl_speculate_vendor()
   endif()
 else()
-  check_VPL_ID("VPL_ID" "${VPL_ID}")
+  _vpl_check_ID("VPL_ID" "${VPL_ID}")
   set(VPL_ID_GUESS "${VPL_ID}")
 endif()
 
@@ -220,7 +226,7 @@ if(VendorPerfLibs_FIND_QUIETLY)
   list(APPEND _find_package_args QUIET)
 endif()
 
-function(warn_MKL_Fortran_ABI_issue CORE_LIB_VAR)
+function(_vpl_warn_MKL_Fortran_ABI_issue CORE_LIB_VAR)
   # https://gitlab.kitware.com/cmake/cmake/-/merge_requests/12479
   # Switch to GNU Fortran ABI regarding how functions return complex numbers and how characters are passed (but not on Apple, where MKL does not provide it).
   # GNU and LLVMFlang families of compilers follow modern C99 _Complex ABI convention.
@@ -240,7 +246,7 @@ function(warn_MKL_Fortran_ABI_issue CORE_LIB_VAR)
   endif()
 endfunction()
 
-macro(find_VPL_core)
+macro(_vpl_find_core)
   set(VPL_CORE_FOUND TRUE)
   if(VPL_ID STREQUAL "IntelMKL")
     # MKL core library support BLAS/LAPACK and FFT.
@@ -262,7 +268,7 @@ macro(find_VPL_core)
     )
 
     if(BLAS_FOUND AND VendorPerfLibs_INCLUDE_DIR)
-      warn_MKL_Fortran_ABI_issue(BLAS_LIBRARIES)
+      _vpl_warn_MKL_Fortran_ABI_issue(BLAS_LIBRARIES)
       # Prefer the BLAS::BLAS target: unlike BLAS_LIBRARIES it also carries BLAS_LINKER_FLAGS.
       if(TARGET BLAS::BLAS)
         set(VPL_CORE_LIBRARIES BLAS::BLAS)
@@ -277,7 +283,7 @@ macro(find_VPL_core)
           list(APPEND _vpl_warning_core_mkl "Intel header file mkl.h not found.\n")
         endif()
         if(NOT BLAS_FOUND)
-          # exactly the same check as in speculateVendor in case it was not called.
+          # exactly the same check as in _vpl_speculate_vendor in case it was not called.
           find_library(_MKL_CORE_TEST_LIB NAMES mkl_core
             HINTS
               ${_VPL_MKL_LIB_HINTS}
@@ -396,7 +402,7 @@ macro(find_VPL_core)
   endif()
 endmacro()
 
-macro(find_VPL_lapack)
+macro(_vpl_find_lapack)
   if(VPL_ID STREQUAL "IntelMKL")
     if(NOT VPL_OMP)
       set(BLA_VENDOR "Intel10_64lp_seq")
@@ -405,7 +411,7 @@ macro(find_VPL_lapack)
     endif()
     find_package(LAPACK ${_find_package_args})
     if(LAPACK_FOUND)
-      warn_MKL_Fortran_ABI_issue(LAPACK_LIBRARIES)
+      _vpl_warn_MKL_Fortran_ABI_issue(LAPACK_LIBRARIES)
     endif()
   elseif(VPL_ID STREQUAL "AOCL")
     if(NOT VPL_OMP)
@@ -463,13 +469,13 @@ macro(find_VPL_lapack)
   endif()
 endmacro()
 
-macro(find_VPL_fft)
+macro(_vpl_find_fft)
   # Default to VPL_ID without caching, so that changing VPL_ID later is not defeated by a stale cached value.
   if(NOT VPL_fft_ID)
     set(VPL_fft_ID "${VPL_ID}")
     list(APPEND _vpl_defaulted_ids VPL_fft_ID)
   endif()
-  check_VPL_ID("VPL_fft_ID" "${VPL_fft_ID}")
+  _vpl_check_ID("VPL_fft_ID" "${VPL_fft_ID}")
 
   set(VPL_FFT_FOUND TRUE)
   if(VPL_fft_ID STREQUAL "IntelMKL")
@@ -534,13 +540,13 @@ macro(find_VPL_fft)
   endif()
 endmacro()
 
-macro(find_VPL_vml)
+macro(_vpl_find_vml)
   # Default to VPL_ID without caching, so that changing VPL_ID later is not defeated by a stale cached value.
   if(NOT VPL_vml_ID)
     set(VPL_vml_ID "${VPL_ID}")
     list(APPEND _vpl_defaulted_ids VPL_vml_ID)
   endif()
-  check_VPL_ID("VPL_vml_ID" "${VPL_vml_ID}")
+  _vpl_check_ID("VPL_vml_ID" "${VPL_vml_ID}")
 
   set(VPL_VML_FOUND TRUE)
   if(VPL_vml_ID STREQUAL "IntelMKL")
@@ -591,18 +597,17 @@ unset(VPL_CORE_LIBRARIES)
 unset(VPL_LAPACK_LINK)
 set(_vpl_lib_found_ids)
 set(_vpl_required_vars _vpl_lib_found_ids)
-find_VPL_core()
+_vpl_find_core()
 
 if(NOT VendorPerfLibs_FIND_COMPONENTS OR "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-  find_VPL_lapack()
+  _vpl_find_lapack()
 endif()
-
 if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-  find_VPL_fft()
+  _vpl_find_fft()
 endif()
 
 if(NOT VendorPerfLibs_FIND_COMPONENTS OR "vml" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
-  find_VPL_vml()
+  _vpl_find_vml()
 endif()
 
 find_package_handle_standard_args(VendorPerfLibs
