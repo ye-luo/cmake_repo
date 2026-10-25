@@ -28,6 +28,8 @@
 
 # FindVendorPerfLibs.cmake
 #
+# This module is maintained at https://github.com/ye-luo/cmake_repo/tree/master/VendorPerfLibs
+#
 # Searches for Vendor Performance Libraries (such as Intel MKL, AMD AOCL, or generic
 # equivalents like Netlib LAPACK and FFTW) and provides a unified interface.
 #
