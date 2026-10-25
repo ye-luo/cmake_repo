@@ -36,6 +36,11 @@
 # - fft    : Fast Fourier Transform
 # - vml    : Vector Math Library
 #
+# Requirements:
+# - The fft component for the Generic and AOCL vendors relies on a project-supplied FindFFTW.cmake
+#   (it is not part of CMake). It must be reachable via CMAKE_MODULE_PATH and support the COMPONENTS
+#   "seq" and "omp", and define FFTW_FOUND, FFTW_INCLUDE_DIR and FFTW_LIBRARIES.
+#
 # Example usage:
 #   find_package(VendorPerfLibs COMPONENTS lapack fft vml REQUIRED)
 #
@@ -63,6 +68,10 @@
 #     5. "NVPL" if the nvpl CMake package was found.
 #     6. "CrayLibSci" if the Cray libsci pkg-config package was found.
 #     7. "Generic" if all previous rules fail.
+#
+#   Note: Autodetection skips (with a warning) AOCL if CMake < 3.27 and NVPL if CMake < 4.1, since the
+#   corresponding BLA_VENDOR values are unavailable. Setting VPL_ID=AOCL or VPL_ID=NVPL explicitly with an
+#   older CMake is a fatal error.
 #
 # - VPL_OMP: If ON, OpenMP threading is requested. If OFF (default), sequential is used.
 #   Note: If ON, you must call find_package(OpenMP) before finding VendorPerfLibs.
@@ -178,12 +187,29 @@ macro(_vpl_speculate_vendor)
     pkg_check_modules(_CRAY_LIBSCI_PKG QUIET sci)
   endif()
 
+  # Do not guess a vendor whose BLA_VENDOR support requires a newer CMake than the one running:
+  # fall back to the next candidate (eventually Generic) with a warning instead of failing later.
+  set(_vpl_aocl_usable ${_AOCL_UTILS_LIB})
+  if(_AOCL_UTILS_LIB AND CMAKE_VERSION VERSION_LESS 3.27)
+    set(_vpl_aocl_usable FALSE)
+    if(NOT VendorPerfLibs_FIND_QUIETLY)
+      message(WARNING "VendorPerfLibs: aoclutils library file found but AOCL support requires CMake 3.27 or newer (current: ${CMAKE_VERSION}). Ignoring AOCL.")
+    endif()
+  endif()
+  set(_vpl_nvpl_usable ${nvpl_FOUND})
+  if(nvpl_FOUND AND CMAKE_VERSION VERSION_LESS 4.1)
+    set(_vpl_nvpl_usable FALSE)
+    if(NOT VendorPerfLibs_FIND_QUIETLY)
+      message(WARNING "VendorPerfLibs: nvpl package found but NVPL support requires CMake 4.1 or newer (current: ${CMAKE_VERSION}). Ignoring NVPL.")
+    endif()
+  endif()
+
   if(_MKL_CORE_TEST_LIB)
     set(VPL_ID_GUESS "IntelMKL")
     if(NOT VendorPerfLibs_FIND_QUIETLY)
       message(STATUS "Found mkl_core library file. Guessed VPL_ID 'IntelMKL'.")
     endif()
-  elseif(_AOCL_UTILS_LIB)
+  elseif(_vpl_aocl_usable)
     set(VPL_ID_GUESS "AOCL")
     if(NOT VendorPerfLibs_FIND_QUIETLY)
       message(STATUS "Found aoclutils library file. Guessed VPL_ID 'AOCL'.")
@@ -193,7 +219,7 @@ macro(_vpl_speculate_vendor)
     if(NOT VendorPerfLibs_FIND_QUIETLY)
       message(STATUS "Found armpl library file. Guessed VPL_ID 'ARMPL'.")
     endif()
-  elseif(nvpl_FOUND)
+  elseif(_vpl_nvpl_usable)
     set(VPL_ID_GUESS "NVPL")
     if(NOT VendorPerfLibs_FIND_QUIETLY)
       message(STATUS "Found nvpl package. Guessed VPL_ID 'NVPL'.")
@@ -209,6 +235,8 @@ macro(_vpl_speculate_vendor)
       message(STATUS "Signs of vendor performance libraries not found. Guessed VPL_ID 'Generic'.")
     endif()
   endif()
+  unset(_vpl_aocl_usable)
+  unset(_vpl_nvpl_usable)
 endmacro()
 
 if(NOT VPL_ID)
@@ -308,6 +336,9 @@ macro(_vpl_find_core)
       endif()
     endif()
   elseif(VPL_ID STREQUAL "AOCL")
+    if(CMAKE_VERSION VERSION_LESS 3.27)
+      message(FATAL_ERROR "VendorPerfLibs: AOCL support requires CMake 3.27 or newer (current: ${CMAKE_VERSION})")
+    endif()
     list(APPEND _vpl_required_vars VendorPerfLibs_INCLUDE_DIR)
 
     set(_vpl_warning_core_aocl)
@@ -638,12 +669,16 @@ if(VendorPerfLibs_FOUND)
   # Create vpl_fft
   if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
     if(NOT TARGET vpl_fft)
+      # Unquoted expansion drops empty variables (e.g. no vendor include dir for Generic).
+      set(_vpl_fft_include_dirs ${VendorPerfLibs_INCLUDE_DIR} ${VendorPerfLibs_FFTW_INCLUDE_DIR})
+      list(REMOVE_DUPLICATES _vpl_fft_include_dirs)
       add_library(vpl_fft INTERFACE IMPORTED)
       set_target_properties(vpl_fft PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES "${VendorPerfLibs_INCLUDE_DIR};${VendorPerfLibs_FFTW_INCLUDE_DIR}"
+        INTERFACE_INCLUDE_DIRECTORIES "${_vpl_fft_include_dirs}"
         INTERFACE_LINK_LIBRARIES "${VPL_FFT_LIBRARIES}"
       )
       add_library(VPL::fft ALIAS vpl_fft)
+      unset(_vpl_fft_include_dirs)
     endif()
   endif()
 
