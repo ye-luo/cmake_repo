@@ -86,7 +86,10 @@ include(FindPackageMessage)
 include(CMakePushCheckState)
 find_package(PkgConfig QUIET)
 
-if(DEFINED ENV{CRAY_LIBSCI_PREFIX_DIR})
+# Cray prefixes must be on CMAKE_PREFIX_PATH for FindBLAS/FindLAPACK (pkg-config) and pkg_check_modules.
+# Save the caller's value, so that it can be restored if the libraries are not found (see end of this module).
+set(_vpl_saved_CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH}")
+if(DEFINED ENV{CRAY_LIBSCI_PREFIX_DIR} AND NOT "$ENV{CRAY_LIBSCI_PREFIX_DIR}" IN_LIST CMAKE_PREFIX_PATH)
   list(APPEND CMAKE_PREFIX_PATH "$ENV{CRAY_LIBSCI_PREFIX_DIR}")
 endif()
 
@@ -598,7 +601,7 @@ macro(_vpl_find_scalapack)
     endif()
 
     if(PkgConfig_FOUND)
-      if(DEFINED ENV{CRAY_MPICH_PREFIX})
+      if(DEFINED ENV{CRAY_MPICH_PREFIX} AND NOT "$ENV{CRAY_MPICH_PREFIX}" IN_LIST CMAKE_PREFIX_PATH)
         list(APPEND CMAKE_PREFIX_PATH "$ENV{CRAY_MPICH_PREFIX}")
       endif()
       pkg_check_modules(_CRAY_SCALAPACK QUIET ${_cray_libsci_mpi_name})
@@ -857,6 +860,7 @@ endif()
 # If the BLAS/LAPACK libraries were found, keep the BLA_* variables as set above so that later find_package(BLAS)
 # and find_package(LAPACK) calls outside this module follow the same discovery.
 # Otherwise restore the caller's original values.
+# The same applies to the Cray prefixes appended to CMAKE_PREFIX_PATH.
 # The lapack result is authoritative when the lapack search ran; otherwise (e.g. only fft or vml requested)
 # use the result of the core (BLAS) search.
 if(DEFINED VendorPerfLibs_lapack_FOUND)
@@ -866,7 +870,9 @@ else()
 endif()
 if(NOT _vpl_blas_lapack_ok)
   _vpl_restore_BLA_vars()
+  set(CMAKE_PREFIX_PATH "${_vpl_saved_CMAKE_PREFIX_PATH}")
 endif()
+unset(_vpl_saved_CMAKE_PREFIX_PATH)
 unset(_vpl_blas_lapack_ok)
 _vpl_clear_BLA_vars()
 
