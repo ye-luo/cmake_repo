@@ -128,7 +128,6 @@ if(VPL_OMP)
   unset(_vpl_omp_flags)
 endif()
 
-
 set(_VPL_VALID_IDS "IntelMKL" "AOCL" "ARMPL" "NVPL" "CrayLibSci" "Generic")
 function(_vpl_check_ID var_name id_to_check)
   if(NOT id_to_check IN_LIST _VPL_VALID_IDS)
@@ -650,6 +649,7 @@ _vpl_find_core()
 if(NOT VendorPerfLibs_FIND_COMPONENTS OR "lapack" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
   _vpl_find_lapack()
 endif()
+
 if(NOT VendorPerfLibs_FIND_COMPONENTS OR "fft" IN_LIST VendorPerfLibs_FIND_COMPONENTS)
   _vpl_find_fft()
 endif()
